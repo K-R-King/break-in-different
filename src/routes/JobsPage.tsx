@@ -14,6 +14,7 @@ import { Icon } from "../components/Icon";
 import { HighlightedText, useReader } from "../voice/reader";
 import { useVoiceHandlers } from "../voice/VoiceProvider";
 import { toAppError } from "../lib/errors";
+import { useFitLayout } from "../lib/useFitLayout";
 
 const MIN_COLUMN_HEIGHT = 360;
 
@@ -141,29 +142,8 @@ export default function JobsPage() {
   const incomplete = profile !== undefined && (!profile || !profile.skills.length || !profile.roleIds.length);
 
   // Wide screens: the page stops scrolling and each column scrolls on its own (styles in base.css).
-  // Only when the columns still get a useful height; with large text the page scrolls as usual.
   const layoutRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (incomplete) return;
-    const root = document.documentElement;
-    const check = () => {
-      const el = layoutRef.current;
-      if (!el) return;
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      const footer = document.querySelector(".footer")?.getBoundingClientRect().height ?? 0;
-      if (window.innerHeight - top - footer - 16 >= MIN_COLUMN_HEIGHT) root.dataset.layout = "fit";
-      else delete root.dataset.layout;
-    };
-    check();
-    const ro = new ResizeObserver(check);
-    for (const el of [document.querySelector(".site-header"), layoutRef.current?.previousElementSibling]) if (el) ro.observe(el);
-    window.addEventListener("resize", check);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", check);
-      delete root.dataset.layout;
-    };
-  }, [incomplete]);
+  useFitLayout(layoutRef, { minWidth: 1100, minHeight: MIN_COLUMN_HEIGHT, enabled: !incomplete });
 
   return (
     <main id="main" className="container jobs-page" style={{ paddingBlock: "32px 48px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
