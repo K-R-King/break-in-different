@@ -16,14 +16,17 @@ describe("canonicalize", () => {
   });
 
   it("keeps a group with several controls, and only the tightest of nested wrappers", () => {
+    const inner = el();
     const out = canonicalize([
-      t(0, "group", ["Filters panel"]),
-      t(1, "group", ["Filters"], 0),
-      t(2, "radio", ["Remote"], 1),
-      t(3, "radio", ["Any"], 1),
+      t(0, "group", ["4. Your disability or neurodivergence"]),
+      t(1, "group", ["Select any that apply"], 0, inner),
+      t(2, "checkbox", ["ADHD"], 1),
+      t(3, "checkbox", ["Dyslexia"], 1),
     ]);
-    expect(out.map((x) => x.label)).toEqual(["Filters", "Remote", "Any"]);
-    expect(out[0].names).toEqual(["Filters", "Filters panel"]);
+    // The inner (tighter) box survives, named by the outer heading people see.
+    expect(out.map((x) => x.label)).toEqual(["4. Your disability or neurodivergence", "ADHD", "Dyslexia"]);
+    expect(out[0].names).toEqual(["4. Your disability or neurodivergence", "Select any that apply"]);
+    expect(out[0].el).toBe(inner);
     expect(out[1].parent).toBe(0);
   });
 

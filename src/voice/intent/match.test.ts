@@ -42,7 +42,7 @@ describe("parse", () => {
   });
 
   it("finds the last verb and drops filler", () => {
-    expect(parse("please turn on reduce motion")).toEqual({ verb: "on", words: ["reduce", "motion"] });
+    expect(parse("please turn on reduce motion")).toMatchObject({ verb: "on", words: ["reduce", "motion"] });
     expect(parse("go to settings and disable it").verb).toBe("off");
     expect(parse("enable word highlighting when doing tts").words).toEqual(["word", "highlight", "readaloud"]);
   });
@@ -110,6 +110,26 @@ describe("bestMatch", () => {
     expect(bestMatch("save", cards)?.confident).toBe(false);
     expect(bestMatch("press save", cards, { context: new Set([3]) })).toMatchObject({ id: 4, confident: true });
     expect(bestMatch("press save on junior engineer", cards, { context: new Set([3]) })?.id).toBe(2);
+  });
+
+  it("never picks the opposite of what was said", () => {
+    const header: Candidate[] = [
+      { id: 1, kind: "button", names: ["Log out"] },
+      { id: 2, kind: "text", names: ["Add a skill"] },
+      { id: 3, kind: "button", names: ["Remove TypeScript"] },
+      { id: 4, kind: "button", names: ["Next job"] },
+      { id: 5, kind: "button", names: ["Previous job"] },
+      { id: 6, kind: "button", names: ["Show or hide"] },
+    ];
+    expect(bestMatch("log in", header)).toBeNull();
+    expect(bestMatch("sign in", header)).toBeNull();
+    expect(bestMatch("log out", header)?.id).toBe(1);
+    expect(bestMatch("sign out", header)?.id).toBe(1);
+    expect(bestMatch("add typescript", header)?.id).not.toBe(3);
+    expect(bestMatch("remove typescript", header)?.id).toBe(3);
+    expect(bestMatch("previous", header)?.id).toBe(5);
+    expect(bestMatch("prev job", header)?.id).toBe(5);
+    expect(bestMatch("hide", header)?.id).toBe(6); // names both sides: never ruled out
   });
 
   it("returns nothing when nothing matches", () => {

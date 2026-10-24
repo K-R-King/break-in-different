@@ -2,7 +2,7 @@
 // labelled region, panel with a heading) by its legend or heading. Alternate names come from
 // data-voice-names="a|b|c". A closed dialog's controls count only when the dialog names its
 // opener (data-voice-opener="<data-voice-id of the button>"), e.g. Accessibility settings.
-import type { Candidate, Kind } from "./match";
+import { tokens, type Candidate, type Kind } from "./match";
 
 export interface Target extends Candidate {
   el: HTMLElement;
@@ -132,7 +132,19 @@ export function scanPage(root: ParentNode = document): Target[] {
     if (!r.ok) continue;
     const id = out.length;
     groupId.set(el, id);
-    out.push({ id, kind: "group", el, label: name || alts[0], names: [name, ...alts].filter(Boolean), parent: parentOf(el), hidden: !!r.opener, opener: r.opener, inView: !r.opener && inView(el) });
+    out.push({
+      id,
+      kind: "group",
+      el,
+      label: name || alts[0],
+      names: [name, ...alts].filter(Boolean),
+      parent: parentOf(el),
+      hidden: !!r.opener,
+      opener: r.opener,
+      inView: !r.opener && inView(el),
+      // The item already open (the selected job's card): its details are shown elsewhere.
+      current: el.getAttribute("aria-current") === "true" || el.getAttribute("aria-current") === "page",
+    });
   }
 
   for (const el of root.querySelectorAll<HTMLElement>(CONTROLS)) {
@@ -207,9 +219,22 @@ export function canonicalize(list: Target[]): Target[] {
     replaced.set(t.id, opener.id);
   }
 
-  // The same control shown on the page and inside a closed dialog: the visible one is enough.
-  const visible = new Set(list.filter((t) => !t.hidden && t.kind !== "group").map((t) => `${t.kind}:${keyOf(t.label)}`));
-  for (const t of list) if (t.hidden && t.kind !== "group" && visible.has(`${t.kind}:${keyOf(t.label)}`)) gone.add(t.id);
+  // The same control shown on the page and inside a closed dialog (same words, any order or
+  // synonym: "Text-to-speech with word highlighting" / "Read aloud with word highlighting"):
+  // the visible one is enough.
+  const meaning = (t: Target) => `${t.kind}:${[...new Set(tokens(t.label))].sort().join(" ")}`;
+  const visible = new Set(list.filter((t) => !t.hidden && t.kind !== "group").map(meaning));
+  for (const t of list) if (t.hidden && t.kind !== "group" && visible.has(meaning(t))) gone.add(t.id);
+
+  // A table-of-contents link ("2. Features to apply" in the Profile's section list) is the
+  // section it jumps to.
+  for (const t of list) {
+    const href = t.kind === "link" ? t.el.getAttribute("href") : null;
+    if (!href?.startsWith("#") || href.length < 2 || !t.el.closest("nav") || gone.has(t.id)) continue;
+    const dest = document.getElementById(href.slice(1));
+    const section = dest && list.find((g) => g.kind === "group" && g.el === dest && !gone.has(g.id));
+    if (section) absorb(section, t);
+  }
 
   // The controls each group contains (any depth).
   const controls = new Map<number, number[]>();
@@ -254,7 +279,13 @@ export function canonicalize(list: Target[]): Target[] {
     if (!inside.length) continue; // text-only region: kept for reading and orientation
     const k = key(g.id);
     const inner = tightest.get(k);
-    if (inner) absorb(inner, g);
+    if (inner) {
+      // Keep the tight inner box, named by the outer heading people see ("4. Your disability or
+      // neurodivergence", not the inner legend "Select any that apply").
+      inner.names = unique([...g.names, ...inner.names]);
+      inner.label = g.label;
+      gone.add(g.id);
+    }
     else tightest.set(k, g);
   }
 
