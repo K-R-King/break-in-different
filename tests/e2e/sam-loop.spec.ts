@@ -39,7 +39,9 @@ test("Sam completes the loop: settings → sign up → profile → jobs → emai
   await expect(page.getByText(/on-site five days a week/).first()).toBeVisible();
 
   // Apply opens the email step prefilled (C2)
-  await first.getByRole("link", { name: /^Apply/ }).click();
+  // The DEMO Full Stack Developer posting (jobs with an employer accommodation form are listed first).
+  const fullStack = cards.filter({ has: page.getByRole("heading", { name: "Full Stack Developer", exact: true }) }).first();
+  await fullStack.getByRole("link", { name: /^Apply/ }).click();
   await expect(page).toHaveURL(/\/email$/);
   const body = page.getByLabel("Message");
   await expect(body).toHaveValue(/Remote work options/, { timeout: 30_000 });

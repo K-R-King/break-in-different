@@ -97,7 +97,7 @@ Repository: `src/` React app · `convex/` backend (`ai/`, `match/`, `ingest/`, `
 ## Data sources
 
 - Curated public Greenhouse and Lever boards (25 employers, `convex/ingest/sources.ts`). Every card names its source, links to the original listing, and shows when it was checked; listings older than 72 hours are flagged.
-- `convex/seedData/snapshot.json`: real public listings collected by `scripts/build-seed.sh`, so the demo works offline. Real apply links are kept. When a listing links to the employer's own accommodation request form (a form link in a paragraph about accommodations), the link and the sentence around it are kept; those jobs show an "Accommodation form" badge, rank first among close scores, and "Request accommodations" opens that form (the email draft stays available).
+- `convex/seedData/snapshot.json`: real public listings collected by `scripts/build-seed.sh`, so the demo works offline. Real apply links are kept. When a listing links to the employer's own accommodation request form (a form link in a paragraph about accommodations), the link and the sentence around it are kept; those jobs show an "Accommodation form" badge, come first on the job board (a filter shows only them), and "Request accommodations" opens that form (the email draft stays available). When a listing's accommodation statement gives an address (for example accommodations@duolingo.com), job details show "This employer accepts accommodation requests" with the quote, and the email's To field is filled in from it.
 - `shared/fixtures/demo-jobs.ts`: 12 fictional DEMO postings, always badged DEMO, covering every label (Stated, Verified, Unverified, Not mentioned) and one explicit on-site conflict.
 - Terms review per source: `docs/sources.md` (sign-off pending).
 
