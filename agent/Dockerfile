@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-alpine
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 SHARED_FIXTURES=/app/shared/fixtures
 COPY agent/requirements.txt ./
