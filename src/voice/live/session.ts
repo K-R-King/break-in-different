@@ -1,14 +1,15 @@
 // One listening session: the microphone plus the Cartesia connection, outside React so no
 // re-render or effect cleanup can tear it down. React subscribes to its snapshot.
 import { Mic, micSupported } from "./mic";
+import { PendingText } from "./pending";
 import { TurnsSocket, type SocketState, type TurnSettings } from "./turnsSocket";
 
 export type ListenStatus = "off" | "starting" | "listening" | "reconnecting";
 
 export interface ListenSnapshot {
   status: ListenStatus;
-  transcript: string; // the line being heard now, or the last finished one
-  final: boolean; // transcript is a finished turn
+  transcript: string; // the whole command heard and not yet acted on, updated word by word
+  final: boolean; // the speaker paused (the last turn ended)
   notice: string;
   level: number; // microphone loudness 0..1
   muted: boolean; // the microphone is open but muted by the system or hardware: nothing is heard
@@ -35,6 +36,7 @@ export class ListenSession {
   private subs = new Set<() => void>();
   private mic: Mic | null = null;
   private socket: TurnsSocket | null = null;
+  private pending = new PendingText();
   turns: TurnListener = {};
 
   constructor(private deps: SessionDeps) {}
@@ -54,6 +56,7 @@ export class ListenSession {
     if (this.active) return;
     if (!window.isSecureContext) return this.set({ ...OFF, notice: this.deps.copy.insecure });
     if (!micSupported()) return this.set({ ...OFF, notice: this.deps.copy.unsupported });
+    this.pending.clear();
     this.set({ ...OFF, status: "starting" });
 
     // The first token is fetched while the microphone starts; reconnects fetch fresh ones.
@@ -84,13 +87,13 @@ export class ListenSession {
         },
         onTurnStart: () => undefined,
         onUpdate: (t) => {
-          this.set({ transcript: t, final: false });
+          this.set({ transcript: this.pending.update(t), final: false });
           this.turns.onUpdate?.(t);
         },
         onEagerEnd: (t) => this.turns.onEagerEnd?.(t),
         onResume: () => this.turns.onResume?.(),
         onEnd: (t) => {
-          this.set({ transcript: t, final: true });
+          this.set({ transcript: this.pending.end(t), final: true });
           this.turns.onEnd?.(t);
         },
         onFatal: (why) => this.fail(this.deps.copy.failed(why)),
@@ -116,6 +119,11 @@ export class ListenSession {
     this.mic = null;
     this.socket = null;
     this.set({ ...OFF, transcript: this.snap.transcript, final: true });
+  }
+
+  // The action recognizer acted on everything heard so far: drop it from the shown command.
+  consume() {
+    this.set({ transcript: this.pending.consume() });
   }
 
   configure(s: TurnSettings) {

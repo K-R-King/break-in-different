@@ -42,7 +42,7 @@ html[data-reduce-motion="true"] .voice-btn::after { animation: none; transition:
 .voice-panel[data-fading="true"] { animation: voice-fade 5s ease-in forwards; }
 @keyframes voice-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 html[data-reduce-motion="true"] .voice-panel[data-fading="true"] { animation: none; }
-.voice-heard { margin: 0; font-weight: 600; min-height: 1.5em; color: var(--voice-strong); overflow-wrap: anywhere; }
+.voice-heard { margin: 0; font-weight: 600; min-height: 1.5em; max-height: 9.5em; overflow-y: auto; color: var(--voice-strong); overflow-wrap: anywhere; }
 .voice-meter { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .voice-meter > span { display: block; height: 100%; background: var(--voice); transform-origin: left; transition: transform 90ms linear; }
 html[data-reduce-motion="true"] .voice-meter > span { transition: none; }

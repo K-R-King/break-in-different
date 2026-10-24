@@ -7,12 +7,6 @@ import "./voice.css";
 
 const LINGER_MS = 5000; // the last line heard stays under the button this long after listening ends
 
-// The end of what is being heard, so the newest words are always visible.
-function tail(t: string, max = 70): string {
-  if (t.length <= max) return t;
-  return `…${t.slice(-max).replace(/^\S*\s/, "")}`;
-}
-
 // The voice control button: green glow while the microphone is really being heard, the line being
 // heard underneath it in real time. The glow fades out when listening ends.
 // The shortcut is the one set in Accessibility settings (default Ctrl+Space): in "hold" mode, talk
@@ -20,6 +14,7 @@ function tail(t: string, max = 70): string {
 // focused button also toggles it.
 export function VoiceButton() {
   const v = useLiveVoice();
+  const heardRef = useRef<HTMLParagraphElement>(null);
   const { combo, mode } = useVoiceKey();
   const descId = useId();
   const on = v.status !== "off";
@@ -85,6 +80,12 @@ export function VoiceButton() {
     };
   }, [combo]);
 
+  // A long command scrolls inside the panel; keep the newest words in view.
+  useEffect(() => {
+    const el = heardRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [v.transcript]);
+
   const showPanel = on || linger || !!v.notice;
   const notice = v.notice || (v.status === "listening" && v.muted ? COPY.voice.mutedNotice : "");
 
@@ -110,8 +111,8 @@ export function VoiceButton() {
       </span>
       {showPanel && (
         <div className="voice-panel" data-fading={!on && !v.notice} role="region" aria-label={COPY.voice.button}>
-          <p className="voice-heard" data-testid="voice-transcript" data-final={v.final} aria-hidden="true">
-            {v.transcript && (on || linger) ? <>“{tail(v.transcript)}”</> : heard ? <span className="muted">{COPY.voice.sayHint}</span> : null}
+          <p ref={heardRef} className="voice-heard" data-testid="voice-transcript" data-final={v.final} aria-hidden="true">
+            {v.transcript && (on || linger) ? <>“{v.transcript}”</> : heard ? <span className="muted">{COPY.voice.sayHint}</span> : null}
           </p>
           {notice && (
             <p className="small muted" style={{ margin: 0 }} data-testid="voice-message">
