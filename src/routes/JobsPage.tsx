@@ -35,6 +35,7 @@ export default function JobsPage() {
   const [locationText, setLocationText] = useState("");
   const [experience, setExperience] = useState<string[]>([]);
   const [statesAll, setStatesAll] = useState(false);
+  const [formOnly, setFormOnly] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [running, setRunning] = useState(false);
@@ -44,7 +45,7 @@ export default function JobsPage() {
 
   const data = useQuery(api.matches.list, {
     workSetup, locationText: locationText.trim() || undefined, statesAllRequired: statesAll || undefined,
-    experience: experience.length ? experience : undefined, search: search.trim() || undefined,
+    experience: experience.length ? experience : undefined, search: search.trim() || undefined, hasForm: formOnly || undefined,
   });
 
   const doRun = async () => {
@@ -225,6 +226,10 @@ export default function JobsPage() {
               <label className="ck" style={{ borderTop: "1px solid #e4e6eb", paddingTop: 14 }}>
                 <input type="checkbox" checked={statesAll} onChange={(e) => setStatesAll(e.target.checked)} />
                 <span><strong>Only show jobs that state all my required accommodations</strong></span>
+              </label>
+              <label className="ck">
+                <input type="checkbox" checked={formOnly} onChange={(e) => setFormOnly(e.target.checked)} />
+                <span><strong>{COPY.jobs.formFilter}</strong><span className="small muted" style={{ display: "block" }}>{COPY.jobs.formFilterHint}</span></span>
               </label>
               <Link to="/profile#s3" style={{ fontWeight: 600 }}>Edit in your profile</Link>
             </div>

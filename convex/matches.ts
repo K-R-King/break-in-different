@@ -268,7 +268,6 @@ export const purgeRequests = internalMutation({
 
 // ---------- Reads ----------
 
-const FORM_BOOST = 10;
 const MAX_ITEMS = 100;
 
 export const list = query({
@@ -278,6 +277,7 @@ export const list = query({
     statesAllRequired: v.optional(v.boolean()),
     experience: v.optional(v.array(v.string())),
     search: v.optional(v.string()),
+    hasForm: v.optional(v.boolean()), // only jobs that link to the employer's accommodation form
   },
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
@@ -303,6 +303,7 @@ export const list = query({
       if (args.workSetup === "remote" && job.workplaceType !== "remote") continue;
       if (args.workSetup === "onsite" && job.workplaceType === "remote") continue;
       if (loc && !job.location.toLowerCase().includes(loc)) continue;
+      if (args.hasForm && !job.accommodationForm) continue;
       if (args.statesAllRequired && (m.accommodationCoverage.requiredNotMentioned.length || m.accommodationCoverage.requiredConflicting.length)) continue;
       // Experience is a filter only; jobs that state no level stay visible.
       if (levels.size && job.experienceLevel !== "not_stated" && !levels.has(job.experienceLevel)) continue;
@@ -336,10 +337,8 @@ export const list = query({
         applicationStatus: appByJob.get(job._id)?.status ?? null,
       });
     }
-    // Jobs with the employer's own accommodation form rank as if they scored up to FORM_BOOST
-    // points higher, so they lead among similar matches. The score shown is unchanged.
-    const rank = (score: number, hasForm: boolean) => score + (hasForm ? FORM_BOOST : 0);
-    items.sort((a, b) => rank(b.score, !!b.job.accommodationForm) - rank(a.score, !!a.job.accommodationForm) || b.score - a.score);
+    // Jobs that link to the employer's own accommodation form come first, then by match score.
+    items.sort((a, b) => Number(!!b.job.accommodationForm) - Number(!!a.job.accommodationForm) || b.score - a.score);
 
     const lastRequest = await ctx.db
       .query("matchRequests")

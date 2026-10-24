@@ -74,7 +74,9 @@ export const COPY = {
   },
   jobs: {
     formBadge: "Accommodation form",
-    sortNote: "Sorted by match score. Jobs with an accommodation form come first among close scores.",
+    sortNote: "Jobs with an accommodation form come first, then by match score.",
+    formFilter: "Only show jobs with an accommodation form",
+    formFilterHint: "The employer links its own form for requesting accommodations.",
     formRequest: "Request accommodations (employer form)",
     title: "Jobs for you",
     lede: "Ranked by your skills, roles and location. Your accommodation needs show beside every job.",
