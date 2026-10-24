@@ -11,9 +11,9 @@ import { LIMITS } from "../shared/taxonomy";
 
 export const CARTESIA_VERSION = "2026-08-14";
 const MODEL = "sonic-3.6";
-const SAMPLE_RATE = 24000;
+export const SAMPLE_RATE = 24000;
 // Any voice works; this one is the example voice in Cartesia's API reference.
-const DEFAULT_VOICE = "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4";
+export const DEFAULT_VOICE = "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4";
 
 type Word = { word: string; start: number; end: number };
 

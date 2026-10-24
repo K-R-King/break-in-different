@@ -13,6 +13,9 @@ C1–C6 approved (C4: email + password, login only); C8 Cartesia for speech-to-t
 6. **Daily ingest cron** (12:00 UTC, 05:00 PT) is now off unless `SCHEDULED_INGEST=1` is set in `.env` (2026-10-24), so demo data does not change during judging. Decide whether to turn it on after the event.
 7. **HR contact email from scraped listings** (QA doc, 2026-10-24). Partly done: when the listing's own accommodation statement gives an address (98 of 369 seeded listings, 7 employers), the email's "To" is prefilled with it and the quote is shown (`convex/lib/accommodationContact.ts`, computed from the listing text when a job is opened). No contacts are looked up elsewhere; recruiter addresses are not in the board APIs. Roman to confirm this is fine under `docs/sources.md`.
 
+7. **Practice interview (`feat/ai-interview-practice`, 2026-10-24).** Roman built it with the AI area cleared for this feature. It adds `src/routes/PracticePage.tsx`, a `/jobs/:id/practice` route and a button on the Jobs detail panel, so **Karthik should review the `src/` changes**. It also adds a new function contract, `ai/practice:plan`, `ai/practice:turn` and `ai/practice:feedback`, which should be announced to the team. Details are in `docs/practice-interview.md`.
+8. **Practice interview: choices to confirm.** (a) Candidate answers go to Claude with condition words replaced by `[removed]`. This keeps the "no disability data in Claude prompts" rule for listed terms, but free text can still describe a condition in other words. The page tells the user this before they start. (b) Interviewer audio sits in Convex file storage for up to 30 minutes, then is deleted. (c) `convex/tts.ts` now exports `SAMPLE_RATE` and `DEFAULT_VOICE` for reuse, with no behavior change.
+
 ## Provisional implementation choices (flagged for review)
 
 - Matching skips the 8 s agent wait when no agent has polled in the last 10 s, so results arrive in under 5 s (A5) when the agent is offline.

@@ -1,4 +1,4 @@
-// axe on all six routes in three modes: default, dyslexia font at 200% text, high contrast.
+// axe on all routes (six screens plus practice) in three modes: default, dyslexia font at 200% text, high contrast.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { buildSamProfile, signUp } from "../helpers";
@@ -32,6 +32,15 @@ for (const [mode, prefs] of Object.entries(MODES)) {
     await page.getByRole("button", { name: "Save and find jobs" }).click();
     await expect(page.getByRole("list", { name: "Job matches" }).getByRole("article").first()).toBeVisible({ timeout: 15_000 });
     await scan(page, `${mode} /jobs`);
+    await page.locator("#detail").getByRole("link", { name: "Practice an interview" }).click();
+    await expect(page.getByRole("button", { name: "Start practice" })).toBeVisible();
+    await scan(page, `${mode} /jobs/:id/practice (setup)`);
+    await page.getByRole("radio", { name: /Written questions/ }).check();
+    await page.getByRole("button", { name: "Start practice" }).click();
+    await expect(page.getByRole("list", { name: "Conversation" }).getByRole("listitem")).toHaveCount(1, { timeout: 30_000 });
+    await scan(page, `${mode} /jobs/:id/practice (conversation)`);
+    await page.goBack();
+    await expect(page.getByRole("list", { name: "Job matches" }).getByRole("article").first()).toBeVisible({ timeout: 15_000 });
     await page.getByRole("list", { name: "Job matches" }).getByRole("article").first().getByRole("link", { name: /^Apply/ }).click();
     await expect(page.getByLabel("Message")).toHaveValue(/Remote/, { timeout: 30_000 });
     await scan(page, `${mode} /jobs/:id/email`);
