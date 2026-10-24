@@ -10,6 +10,7 @@ import { highlights, HighlightLayer } from "./highlight";
 import { alreadyHere, bestMatch, parse, type Match } from "./match";
 import { highlightBox, scanCached, type Target } from "./scan";
 import { parseScroll, scrollPage } from "./scroll";
+import { resolveVerbOnly } from "./resolve";
 
 // The line under the transcript: what voice control is about to do, did, or needs.
 let status = "";
@@ -27,6 +28,7 @@ export function useIntentStatus(): string {
   );
 }
 
+const SELECTION_AFTER_STOP_MS = 10_000;
 const STOP_LISTENING = /\b(stop listening|stop voice( control)?|turn off voice control|that's all|goodbye)\b/i;
 
 export function VoiceIntent() {
@@ -69,7 +71,8 @@ export function VoiceIntent() {
         });
     };
 
-    const evaluate = (final: boolean) => {
+    // definite: the turn really ended (turn.end), not just predicted to (turn.eager_end).
+    const evaluate = (final: boolean, definite = false) => {
       if (busy.current) return;
       const text = session.getSnapshot().transcript;
       if (!text) {
@@ -96,23 +99,44 @@ export function VoiceIntent() {
       performance.mark("voice:scanned");
       // Just a verb ("turn it on", "press it", "yes"): it applies to what is selected now.
       const said = parse(text);
+      // Only filler ("it.", "um", "please"): nothing to do, and nothing to say about it.
+      if (!said.verb && !said.words.length) {
+        if (final) session.consume();
+        return;
+      }
       if (said.verb && !said.words.length) {
-        const id = idOf(targets, recent.current) ?? idOf(targets, document.activeElement);
+        // The selection: what was last selected or acted on, else what has focus, else the
+        // region around the focus.
+        const focus = document.activeElement !== document.body ? document.activeElement : null;
+        const around = focus ? targets.filter((t) => t.kind === "group" && t.el.contains(focus)).at(-1)?.id : undefined;
+        const anchor = idOf(targets, recent.current) ?? idOf(targets, focus) ?? around;
+        const r = resolveVerbOnly(said.verb, anchor, targets);
         if (!final) {
           // Show what the verb will apply to while it is still being said.
-          if (id !== undefined) {
-            const label = intentLabel(targets[id], said.verb);
-            highlights.guess(highlightBox(targets[id]), label);
+          if (r) {
+            const id = "act" in r ? r.act : r.ask;
+            const label = "act" in r ? intentLabel(targets[id], said.verb) : targets[id].label;
+            highlights.guess(highlightBox(targets[id]), label, "act" in r ? "guess" : "unsure");
             setStatus(label);
           }
           return;
         }
-        if (id === undefined) {
-          session.consume();
-          setStatus(COPY.voice.nothingSelected);
+        // A bare verb ("enable…") is usually the start of a longer command: wait for the real end
+        // of the turn unless it is clearly complete ("enable it", "yes").
+        if (!definite && said.verb !== "do" && !/\b(it|that|this|them|those)\b/i.test(text)) return;
+        session.consume();
+        if (!r) {
+          setStatus(anchor === undefined ? COPY.voice.nothingSelected : COPY.voice.verbDoesNotFit(targets[anchor].label));
+          announce(anchor === undefined ? COPY.voice.nothingSelected : COPY.voice.verbDoesNotFit(targets[anchor].label));
           return;
         }
-        run(targets[id], said.verb);
+        if ("act" in r) return run(targets[r.act], said.verb);
+        // Several fit: keep the region selected and ask.
+        recent.current = targets[r.ask].el;
+        highlights.guess(highlightBox(targets[r.ask]), targets[r.ask].label, "unsure");
+        const ask = COPY.voice.whichOf(r.options.map((i) => targets[i].label));
+        setStatus(ask);
+        announce(ask);
         return;
       }
       let m = pick(text, targets);
@@ -158,7 +182,7 @@ export function VoiceIntent() {
       },
       onEnd: (turn) => {
         lastTurn.current = turn;
-        evaluate(true);
+        evaluate(true, true);
       },
     };
     return () => {
@@ -166,12 +190,16 @@ export function VoiceIntent() {
     };
   }, [session, announce]);
 
-  // Listening ended: the guess goes (an action's fading highlight stays until it fades).
+  // Listening ended: the guess goes; the selection stays a while longer, then fades.
   useEffect(() => {
-    if (listen === "off") {
-      highlights.clearGuess();
-      setStatus("");
-    }
+    if (listen !== "off") return;
+    highlights.clearGuess();
+    const t = highlights.expireSelection(SELECTION_AFTER_STOP_MS);
+    const s = window.setTimeout(() => setStatus(""), SELECTION_AFTER_STOP_MS);
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(s);
+    };
   }, [listen]);
 
   return <HighlightLayer />;

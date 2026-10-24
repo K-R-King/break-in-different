@@ -13,6 +13,12 @@ html[data-contrast="high"] {
 }
 
 .voice-wrap { position: relative; display: inline-flex; flex-direction: column; }
+/* Always on screen: the button lives in a top-layer dock placed over .voice-slot in the header,
+   or docked at the top of the window (see VoiceButton). */
+.voice-slot { display: inline-block; }
+.voice-dock[popover] { position: fixed; inset: auto; margin: 0; padding: 0; border: 0; background: transparent; overflow: visible; color: inherit; }
+.voice-dock[popover]:not(:popover-open) { display: none; }
+.voice-dock[data-docked="true"] .voice-btn { box-shadow: 0 6px 22px rgba(20, 21, 26, 0.22); }
 .voice-btn { position: relative; transition: border-color 600ms ease-out, background-color 600ms ease-out, color 600ms ease-out; }
 /* Starting or reconnecting: green outline, no glow (nothing is being heard yet). */
 .voice-btn[aria-pressed="true"] { border-color: var(--voice); color: var(--voice-strong); background: var(--voice-bg); }
@@ -43,8 +49,8 @@ html[data-reduce-motion="true"] .voice-btn::after { animation: none; transition:
 /* In the top layer (popover): fixed under the button, placed by VoiceButton. */
 .voice-panel[popover] { position: fixed; inset: auto; overflow: visible; }
 .voice-panel[popover]:not(:popover-open) { display: none; }
-.voice-panel[data-fading="true"] { animation: voice-fade 5s ease-in forwards; }
-@keyframes voice-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+.voice-panel[data-fading="true"] { animation: voice-fade 12s ease-in forwards; }
+@keyframes voice-fade { 0%, 88% { opacity: 1; } 100% { opacity: 0; } }
 html[data-reduce-motion="true"] .voice-panel[data-fading="true"] { animation: none; }
 .voice-heard { margin: 0; font-weight: 600; min-height: 1.5em; max-height: 9.5em; overflow-y: auto; color: var(--voice-strong); overflow-wrap: anywhere; }
 .voice-meter { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
@@ -61,14 +67,14 @@ html[data-reduce-motion="true"] .voice-meter > span { transition: none; }
 }
 .voice-hl[data-state="unsure"] { border-style: dotted; }
 .voice-hl[data-state="doing"], .voice-hl[data-state="done"] { border-style: solid; background: rgba(21, 128, 61, 0.12); }
-.voice-hl[data-state="done"] { animation: voice-hl-out 1.5s ease-in forwards; }
-@keyframes voice-hl-out { 0%, 55% { opacity: 1; } 100% { opacity: 0; } }
+.voice-hl[data-fading] { animation: voice-hl-out 1.2s ease-in forwards; }
+@keyframes voice-hl-out { from { opacity: 1; } to { opacity: 0; } }
 .voice-hl-tag {
   position: absolute; left: -3px; bottom: calc(100% + 2px); max-width: min(420px, 90vw);
   padding: 2px 8px; border-radius: 8px; background: var(--voice); color: #fff;
   font-size: 0.82rem; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 html[data-reduce-motion="true"] .voice-hl { transition: none; }
-html[data-reduce-motion="true"] .voice-hl[data-state="done"] { animation-duration: 0.01s; animation-delay: 1.4s; }
+html[data-reduce-motion="true"] .voice-hl[data-fading] { animation-duration: 0.01s; animation-delay: 1.1s; }
 @media (prefers-reduced-motion: reduce) { .voice-hl { transition: none; } }
 .voice-intent { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--voice-strong); }

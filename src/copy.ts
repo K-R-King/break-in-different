@@ -131,6 +131,9 @@ export const COPY = {
     failed: (why: string) => `Voice control stopped: ${why}`,
     scrollingUp: "Scroll up",
     scrollingDown: "Scroll down",
+    verbDoesNotFit: (name: string) => `"${name}" can't do that. Say the name of the control you mean.`,
+    whichOf: (names: string[]) =>
+      `Which one: ${names.length > 4 ? `${names.slice(0, 4).join(", ")} or ${names.length - 4} more` : `${names.slice(0, -1).join(", ")} or ${names.at(-1)}`}?`,
     nothingSelected: "Nothing is selected yet. Say the name of a button, link or setting first.",
     alreadyHere: (page: string) => `You're already on ${page}.`,
     noMatch: "Nothing on this page matches that yet. Try the name of a button, link or setting.",

@@ -8,6 +8,7 @@ export interface Target extends Candidate {
   el: HTMLElement;
   opener?: HTMLElement; // click this first to reveal el
   danger?: boolean; // irreversible: voice may point at it but never press it
+  toggle?: boolean; // a button that stays pressed (aria-pressed)
   label: string; // the name shown and spoken
 }
 
@@ -163,6 +164,7 @@ export function scanPage(root: ParentNode = document): Target[] {
       checked,
       inView: !r.opener && inView(el),
       danger: !!el.closest("[data-voice-danger]"),
+      toggle: kind === "button" && el.hasAttribute("aria-pressed"),
     });
   }
   return canonicalize(out);

@@ -6,7 +6,10 @@ import { useLiveVoice } from "./LiveVoice";
 import { useIntentStatus } from "../intent/VoiceIntent";
 import "./voice.css";
 
-const LINGER_MS = 5000; // the last line heard stays under the button this long after listening ends
+// Top-layer support (all current browsers); without it the button simply stays in the header.
+const POPOVER = typeof HTMLElement !== "undefined" && "popover" in HTMLElement.prototype;
+
+const LINGER_MS = 12000; // the last line heard stays under the button this long after listening ends
 
 // The voice control button: green glow while the microphone is really being heard, the line being
 // heard underneath it in real time. The glow fades out when listening ends.
@@ -90,68 +93,131 @@ export function VoiceButton() {
 
   const showPanel = on || linger || !!v.notice;
 
-  // The panel lives in the top layer (popover) so it stays readable above an open modal dialog
-  // such as Accessibility settings, and is raised again whenever a dialog opens.
+  // The button is always on screen: it sits in its header slot, and docks at the top of the window
+  // when the slot scrolls away or a dialog opens (left of a slide-over such as Accessibility
+  // settings). Button and panel live in the top layer (popover), raised whenever a dialog opens,
+  // so nothing covers them. Placed every frame: labels change width and the header can rewrap.
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const slotRef = useRef<HTMLSpanElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const panel = panelRef.current;
+    const dock = dockRef.current;
+    const slot = slotRef.current;
     const btn = btnRef.current;
-    if (!showPanel || !panel || !btn) return;
-    // Follow the button every frame: its label changes width and the header can rewrap.
-    let raf = 0;
-    const place = () => {
-      const r = btn.getBoundingClientRect();
-      const top = `${Math.max(8, r.bottom + 10)}px`;
-      const right = `${Math.max(16, window.innerWidth - r.right)}px`;
-      if (panel.style.top !== top) panel.style.top = top;
-      if (panel.style.right !== right) panel.style.right = right;
-      raf = requestAnimationFrame(place);
-    };
-    const raise = () => {
+    if (!POPOVER || !dock || !slot || !btn) return;
+    const raise = (el: HTMLElement | null) => {
+      if (!el) return;
       try {
-        if (panel.matches(":popover-open")) panel.hidePopover();
-        panel.showPopover();
+        if (el.matches(":popover-open")) el.hidePopover();
+        el.showPopover();
       } catch {
-        /* popover unsupported: the panel still shows in place */
+        /* not supported: shown in place */
       }
     };
+    const raiseAll = () => {
+      raise(dock);
+      raise(panelRef.current);
+    };
+    raiseAll();
+    const size = new ResizeObserver(() => {
+      slot.style.width = `${btn.offsetWidth}px`;
+      slot.style.height = `${btn.offsetHeight}px`;
+    });
+    size.observe(btn);
+
+    let raf = 0;
+    const set = (el: HTMLElement, prop: "top" | "left" | "right", v: string) => {
+      if (el.style[prop] !== v) el.style[prop] = v;
+    };
+    const place = () => {
+      const vw = window.innerWidth;
+      const s = slot.getBoundingClientRect();
+      const modal = document.querySelector("dialog[open]");
+      const docked = !!modal || s.top < 0 || s.bottom > window.innerHeight || !s.width;
+      dock.dataset.docked = String(docked);
+      if (docked) {
+        // Stay clear of a dialog that covers the right edge (the settings slide-over).
+        const d = modal?.getBoundingClientRect();
+        const right = d && d.right >= vw - 2 && d.left > vw * 0.3 ? vw - d.left + 12 : 16;
+        set(dock, "top", "12px");
+        set(dock, "left", `${Math.max(8, vw - right - btn.offsetWidth)}px`);
+      } else {
+        set(dock, "top", `${s.top}px`);
+        set(dock, "left", `${s.left}px`);
+      }
+      const panel = panelRef.current;
+      if (panel) {
+        const b = btn.getBoundingClientRect();
+        set(panel, "top", `${Math.max(8, b.bottom + 10)}px`);
+        set(panel, "right", `${Math.max(8, vw - b.right)}px`);
+      }
+      raf = requestAnimationFrame(place);
+    };
     place();
-    raise();
     const mo = new MutationObserver((recs) => {
-      if (recs.some((r) => r.target instanceof HTMLDialogElement && r.target.open)) raise();
+      if (recs.some((r) => r.target instanceof HTMLDialogElement && r.target.open)) raiseAll();
     });
     mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"] });
     return () => {
       mo.disconnect();
+      size.disconnect();
       cancelAnimationFrame(raf);
     };
+  }, []);
+  // A newly shown panel goes on top of everything, including the button's dock.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!showPanel || !panel || !POPOVER) return;
+    try {
+      if (!panel.matches(":popover-open")) panel.showPopover();
+    } catch {
+      /* not supported: shown in place */
+    }
   }, [showPanel]);
   const notice = v.notice || (v.status === "listening" && v.muted ? COPY.voice.mutedNotice : "");
 
   return (
     <div className="voice-wrap" data-active={on}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="btn btn-secondary voice-btn"
-        data-state={v.status}
-        data-heard={heard}
-        data-testid="voice-button"
-        aria-pressed={on}
-        aria-describedby={descId}
-        aria-keyshortcuts={[combo.ctrl && "Control", combo.alt && "Alt", combo.shift && "Shift", combo.meta && "Meta", combo.code.replace(/^(Key|Digit)/, "")].filter(Boolean).join("+")}
-        onClick={v.toggle}
-      >
-        <Icon name="mic" />
-        {label}
-        <kbd className="kbd">{shortcut}</kbd>
-      </button>
+      {POPOVER && <span ref={slotRef} className="voice-slot" aria-hidden="true" />}
+      <div ref={dockRef} popover={POPOVER ? "manual" : undefined} className="voice-dock">
+        <button
+          type="button"
+          ref={btnRef}
+          className="btn btn-secondary voice-btn"
+          data-state={v.status}
+          data-heard={heard}
+          data-testid="voice-button"
+          aria-pressed={on}
+          aria-describedby={descId}
+          aria-keyshortcuts={[
+            combo.ctrl && "Control",
+            combo.alt && "Alt",
+            combo.shift && "Shift",
+            combo.meta && "Meta",
+            combo.code.replace(/^(Key|Digit)/, ""),
+          ]
+            .filter(Boolean)
+            .join("+")}
+          onClick={v.toggle}
+        >
+          <Icon name="mic" />
+          {label}
+          <kbd className="kbd">{shortcut}</kbd>
+        </button>
+      </div>
       <span id={descId} className="sr-only">
         {COPY.voice.shortcut(shortcut)} {COPY.voice.privacy}
       </span>
       {showPanel && (
-        <div ref={panelRef} popover="manual" className="voice-panel" data-fading={!on && !v.notice} role="region" aria-label={COPY.voice.button}>
+        <div
+          ref={panelRef}
+          popover="manual"
+          className="voice-panel"
+          data-fading={!on && !v.notice}
+          role="region"
+          aria-label={COPY.voice.button}
+        >
           <p ref={heardRef} className="voice-heard" data-testid="voice-transcript" data-final={v.final} aria-hidden="true">
             {v.transcript && (on || linger) ? <>“{v.transcript}”</> : heard ? <span className="muted">{COPY.voice.sayHint}</span> : null}
           </p>

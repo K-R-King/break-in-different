@@ -1,6 +1,8 @@
 // Green highlights for voice control. "guess": what the person seems to mean, drawn while they
-// are still talking. "doing": the action is running. "done": lingers and fades after the action,
-// even if the element is gone (the page changed), so nothing changes without a visual cue.
+// are still talking. "doing": the action is running. "done": the current selection (what "it"
+// means next). It stays until something else is selected, so a low-vision user never loses track;
+// it fades only when its element is gone (after a page change, once LINGER_MS has passed) or a
+// while after listening stops.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import "../live/voice.css";
@@ -12,9 +14,11 @@ export interface Highlight {
   el: HTMLElement;
   label: string;
   state: HighlightState;
+  fading?: boolean;
 }
 
-const LINGER_MS = 1500;
+const LINGER_MS = 1500; // a selection whose element vanished (page changed) stays this long
+const FADE_MS = 1200;
 const SETTLE_MS = 350; // a guess this stable is worth scrolling to
 
 let items: Highlight[] = [];
@@ -47,12 +51,22 @@ export const highlights = {
     const cur = items.find((h) => h.state !== "done" && h.el === el);
     setItems([...items.filter((h) => h.state === "done"), { key: cur?.key ?? nextKey++, el, label, state: "doing" }]);
   },
-  // Turn the active highlight into a fading one. `el` may have moved (opener -> real control).
+  // The action finished: its highlight becomes the selection, replacing the previous one.
+  // `el` may have moved (opener -> real control).
   done(el: HTMLElement, label: string) {
     const cur = items.find((h) => h.state === "doing");
     const key = cur?.key ?? nextKey++;
-    setItems([...items.filter((h) => h !== cur && h.el !== el), { key, el, label, state: "done" }]);
-    window.setTimeout(() => setItems(items.filter((h) => h.key !== key)), LINGER_MS);
+    setItems([...items.filter((h) => h !== cur && h.state !== "done" && h.el !== el), { key, el, label, state: "done" }]);
+  },
+  // Fade out and remove one highlight, or every selection after `delay` ms.
+  fade(key: number) {
+    if (!items.some((h) => h.key === key && !h.fading)) return;
+    setItems(items.map((h) => (h.key === key ? { ...h, fading: true } : h)));
+    window.setTimeout(() => setItems(items.filter((h) => h.key !== key)), FADE_MS);
+  },
+  expireSelection(delay: number) {
+    const keys = items.filter((h) => h.state === "done").map((h) => h.key);
+    return window.setTimeout(() => keys.forEach((k) => highlights.fade(k)), delay);
   },
   clearAll: () => setItems([]),
 };
@@ -84,12 +98,17 @@ function Ring({ h }: { h: Highlight }) {
   const [box, setBox] = useState<Box | null>(() => boxOf(h.el));
   const scrolled = useRef<HTMLElement | null>(null);
 
-  // Follow the element every frame (scrolling, layout shifts); keep the last box if it vanishes.
+  // Follow the element every frame (scrolling, layout shifts); keep the last box if it vanishes,
+  // then fade once it has been gone for LINGER_MS.
   useEffect(() => {
     let raf = 0;
+    let goneSince = 0;
     const tick = () => {
       const b = boxOf(h.el);
       if (b) last.current = b;
+      if (h.el.isConnected) goneSince = 0;
+      else if (!goneSince) goneSince = performance.now();
+      else if (performance.now() - goneSince > LINGER_MS) highlights.fade(h.key);
       setBox((prev) => {
         const next = b ?? last.current;
         if (prev && next && prev.top === next.top && prev.left === next.left && prev.width === next.width && prev.height === next.height) return prev;
@@ -99,7 +118,7 @@ function Ring({ h }: { h: Highlight }) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [h.el]);
+  }, [h.el, h.key]);
 
   // Bring an off-screen target into view once the prediction has settled (a guess that held for
   // SETTLE_MS), or at once when acting, so the page does not jump around while words arrive.
@@ -122,6 +141,7 @@ function Ring({ h }: { h: Highlight }) {
     <div
       className="voice-hl"
       data-state={h.state}
+      data-fading={h.fading || undefined}
       data-testid="voice-highlight"
       style={{ top: box.top - pad, left: box.left - pad, width: box.width + pad * 2, height: box.height + pad * 2 }}
     >

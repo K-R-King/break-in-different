@@ -4,6 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { useAnnounce } from "../../a11y/Announcer";
 import { COPY } from "../../copy";
 import { ListenSession, type ListenSnapshot } from "./session";
+import { voiceKeyterms } from "../intent/keyterms";
 
 interface LiveVoiceCtx extends ListenSnapshot {
   session: ListenSession;
@@ -33,6 +34,7 @@ export function LiveVoiceProvider({ children }: { children: ReactNode }) {
           deviceLost: COPY.voice.deviceLost,
           failed: COPY.voice.failed,
         },
+        keyterms: voiceKeyterms,
       }),
     [],
   );
