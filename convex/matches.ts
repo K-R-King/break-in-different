@@ -274,7 +274,7 @@ export const list = query({
   args: {
     workSetup: v.optional(v.union(v.literal("remote"), v.literal("onsite"), v.literal("any"))),
     locationText: v.optional(v.string()),
-    statesAllRequired: v.optional(v.boolean()),
+    hideConflicts: v.optional(v.boolean()), // hide listings that contradict a required accommodation
     experience: v.optional(v.array(v.string())),
     search: v.optional(v.string()),
     hasForm: v.optional(v.boolean()), // only jobs that link to the employer's accommodation form
@@ -304,7 +304,7 @@ export const list = query({
       if (args.workSetup === "onsite" && job.workplaceType === "remote") continue;
       if (loc && !job.location.toLowerCase().includes(loc)) continue;
       if (args.hasForm && !job.accommodationForm) continue;
-      if (args.statesAllRequired && (m.accommodationCoverage.requiredNotMentioned.length || m.accommodationCoverage.requiredConflicting.length)) continue;
+      if (args.hideConflicts && m.accommodationCoverage.requiredConflicting.length) continue;
       // Experience is a filter only; jobs that state no level stay visible.
       if (levels.size && job.experienceLevel !== "not_stated" && !levels.has(job.experienceLevel)) continue;
       if (search) {

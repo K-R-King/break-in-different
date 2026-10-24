@@ -24,6 +24,7 @@ import type * as ingest_rules from "../ingest/rules.js";
 import type * as ingest_run from "../ingest/run.js";
 import type * as ingest_sources from "../ingest/sources.js";
 import type * as jobs from "../jobs.js";
+import type * as lib_accommodationContact from "../lib/accommodationContact.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "ingest/run": typeof ingest_run;
   "ingest/sources": typeof ingest_sources;
   jobs: typeof jobs;
+  "lib/accommodationContact": typeof lib_accommodationContact;
   "lib/auth": typeof lib_auth;
   "lib/errors": typeof lib_errors;
   "lib/rateLimit": typeof lib_rateLimit;
