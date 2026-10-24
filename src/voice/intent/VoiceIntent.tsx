@@ -7,7 +7,7 @@ import { COPY } from "../../copy";
 import { useLiveVoice } from "../live/LiveVoice";
 import { execute, intentLabel } from "./execute";
 import { highlights, HighlightLayer } from "./highlight";
-import { alreadyHere, bestMatch, parse, type Match } from "./match";
+import { alreadyHere, bestMatch, parse, type Match, type Verb } from "./match";
 import { highlightBox, scanCached, type Target } from "./scan";
 import { parseScroll, scrollPage } from "./scroll";
 import { resolveVerbOnly } from "./resolve";
@@ -29,6 +29,8 @@ export function useIntentStatus(): string {
 }
 
 const SELECTION_AFTER_STOP_MS = 10_000;
+const SUGGESTION_MS = 20_000; // how long "yes" can still confirm a "Did you mean …?"
+const NO = /^\W*(no|nope|no thanks|never ?mind|cancel|wrong)\W*$/i;
 const STOP_LISTENING = /\b(stop listening|stop voice( control)?|turn off voice control|that's all|goodbye)\b/i;
 
 export function VoiceIntent() {
@@ -38,6 +40,8 @@ export function VoiceIntent() {
   const guessed = useRef<HTMLElement | null>(null); // the guess highlighted now
   const busy = useRef(false);
   const lastTurn = useRef("");
+  // The last "Did you mean …?": "yes" carries it out with the verb that was said, "no" drops it.
+  const suggestion = useRef<{ el: HTMLElement; verb: Verb | null; at: number } | null>(null);
 
   useEffect(() => {
     const idOf = (targets: Target[], el: Element | null) => (el ? targets.find((t) => t.el === el)?.id : undefined);
@@ -54,6 +58,7 @@ export function VoiceIntent() {
 
     const run = (t: Target, verb: Match["verb"]) => {
       busy.current = true;
+      suggestion.current = null;
       guessed.current = null;
       session.consume();
       const label = intentLabel(t, verb);
@@ -76,7 +81,7 @@ export function VoiceIntent() {
       if (busy.current) return;
       const text = session.getSnapshot().transcript;
       if (!text) {
-        highlights.clearGuess();
+        if (!suggestion.current) highlights.clearGuess(); // keep showing what "yes" would confirm
         return;
       }
       if (final && STOP_LISTENING.test(text)) {
@@ -97,8 +102,31 @@ export function VoiceIntent() {
       performance.mark("voice:match-start");
       const targets = scanCached();
       performance.mark("voice:scanned");
-      // Just a verb ("turn it on", "press it", "yes"): it applies to what is selected now.
       const said = parse(text);
+
+      // Answering a "Did you mean …?": "yes" confirms the suggestion, "no" drops it; anything
+      // else is a new command and replaces it.
+      const s = suggestion.current;
+      if (s && (Date.now() - s.at > SUGGESTION_MS || !s.el.isConnected)) suggestion.current = null;
+      if (suggestion.current && said.verb === "do" && !said.words.length) {
+        const id = idOf(targets, suggestion.current.el);
+        if (!final || id === undefined) return;
+        session.consume();
+        run(targets[id], suggestion.current.verb);
+        return;
+      }
+      if (suggestion.current && NO.test(text)) {
+        if (!final) return;
+        session.consume();
+        suggestion.current = null;
+        highlights.clearGuess();
+        setStatus(COPY.voice.dismissed);
+        announce(COPY.voice.dismissed);
+        return;
+      }
+      if (final) suggestion.current = null;
+
+      // Just a verb ("turn it on", "press it", "yes"): it applies to what is selected now.
       // Only filler ("it.", "um", "please"): nothing to do, and nothing to say about it.
       if (!said.verb && !said.words.length) {
         if (final) session.consume();
@@ -162,7 +190,16 @@ export function VoiceIntent() {
         highlights.guess(highlightBox(t), label, final ? "unsure" : "guess");
         if (final) {
           const rival = m.ambiguousWith !== undefined ? targets[m.ambiguousWith] : undefined;
-          setStatus(rival ? COPY.voice.whichOne(t.label, rival.label) : COPY.voice.unsure(t.label));
+          // One clear best guess: offer it, and let "yes" confirm it. (With two close ones the words
+          // stay, so naming one of them completes the command.)
+          // Only once the turn really ended: a predicted end can come while they are still talking.
+          if (!rival && definite) {
+            suggestion.current = { el: t.el, verb: m.verb, at: Date.now() };
+            session.consume();
+          }
+          const ask = rival ? COPY.voice.whichOne(t.label, rival.label) : COPY.voice.unsure(t.label);
+          setStatus(ask);
+          if (definite) announce(ask);
         } else setStatus(label);
         return;
       }
@@ -193,6 +230,7 @@ export function VoiceIntent() {
   // Listening ended: the guess goes; the selection stays a while longer, then fades.
   useEffect(() => {
     if (listen !== "off") return;
+    suggestion.current = null;
     highlights.clearGuess();
     const t = highlights.expireSelection(SELECTION_AFTER_STOP_MS);
     const s = window.setTimeout(() => setStatus(""), SELECTION_AFTER_STOP_MS);
