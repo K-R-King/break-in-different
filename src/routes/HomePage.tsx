@@ -4,6 +4,7 @@ import { COPY } from "../copy";
 import { PageHeading, useDocumentTitle } from "../a11y/PageHeading";
 import { usePrefs } from "../a11y/prefs";
 import { Icon } from "../components/Icon";
+import { StatsCarousel } from "../components/StatsCarousel";
 
 export function HomePage() {
   useDocumentTitle("");
@@ -28,11 +29,7 @@ export function HomePage() {
           </div>
           <p className="muted" style={{ margin: 0 }}>{c.noAccount}</p>
         </div>
-        <aside aria-label="Why this matters" className="card" style={{ flex: "1 1 320px", gap: 12 }}>
-          <p style={{ margin: 0, fontSize: "3.3rem", fontWeight: 800, lineHeight: 1 }}>{c.statFigure}</p>
-          <p style={{ margin: 0, fontSize: "1.12rem", fontWeight: 600 }}>{c.statLine}</p>
-          <p className="small muted" style={{ margin: 0 }}>{c.statCaveat}</p>
-        </aside>
+        <StatsCarousel />
       </section>
 
       <nav aria-labelledby="places-h" className="stack">

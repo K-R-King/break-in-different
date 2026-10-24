@@ -167,3 +167,82 @@ html[data-layout="fit"] .profile-page { flex-wrap: nowrap; align-items: stretch;
 html[data-layout="fit"] .profile-nav, html[data-layout="fit"] .profile-form { min-height: 0; overflow-y: auto; overscroll-behavior: contain; position: relative; }
 html[data-layout="fit"] .profile-nav { padding: 2px 4px 16px 2px; }
 html[data-layout="fit"] .profile-form { padding: 2px 8px 24px 2px; }
+
+/* Hero facts carousel: one active card, previews of its neighbours, seamless loop. */
+.stats-carousel {
+  --peek: 56px;
+  --gap: 16px;
+  --card-w: calc(100% - 2 * (var(--peek) + var(--gap)));
+  flex: 1 1 520px;
+  max-width: 580px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.stats-viewport {
+  overflow: hidden;
+  /* Previews fade out at the edges; the active card is untouched. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 calc(var(--peek) * 0.9), #000 calc(100% - var(--peek) * 0.9), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 calc(var(--peek) * 0.9), #000 calc(100% - var(--peek) * 0.9), transparent 100%);
+  padding-block: 6px;
+}
+.stats-track {
+  display: flex;
+  gap: var(--gap);
+  align-items: stretch; /* every card as tall as the tallest: no height change between facts */
+  /* Percentages here are the track's width, which equals the viewport's. */
+  transform: translateX(calc(var(--peek) + var(--gap) - var(--pos) * (var(--card-w) + var(--gap))));
+  will-change: transform;
+}
+.stats-track[data-animate="true"] {
+  transition: transform 700ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.stat-card {
+  flex: 0 0 var(--card-w);
+  min-width: 0;
+  gap: 12px;
+  justify-content: flex-start;
+  transform: scale(0.94);
+  transform-origin: center;
+}
+.stat-card[data-active="true"] {
+  transform: none;
+}
+.stats-track[data-animate="true"] .stat-card {
+  transition: transform 700ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.stat-figure {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.4em;
+  font-weight: 800;
+  line-height: 1;
+}
+.stat-figure-main { font-size: 3.3rem; white-space: nowrap; }
+.stat-figure-sub { font-size: 1.9rem; white-space: nowrap; color: var(--muted-2); }
+.stat-statement { margin: 0; font-size: 1.12rem; font-weight: 600; line-height: 1.35; }
+.stat-context, .stat-source { margin: 0; }
+.stat-source { margin-top: auto; padding-top: 2px; }
+.stat-points { margin: 0; padding-left: 1.2em; }
+.stat-points li + li { margin-top: 2px; }
+.stats-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-inline: calc(var(--peek) + var(--gap));
+}
+@media (max-width: 900px) {
+  .stats-carousel { --peek: 32px; --gap: 12px; max-width: 600px; }
+}
+@media (max-width: 480px) {
+  .stats-carousel { --peek: 14px; --gap: 8px; flex-basis: 100%; }
+  .stat-figure-main { font-size: 2.7rem; }
+  .stat-figure-sub { font-size: 1.6rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stats-track[data-animate="true"], .stats-track[data-animate="true"] .stat-card { transition: none; }
+}
