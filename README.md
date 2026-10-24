@@ -122,6 +122,10 @@ Target: WCAG 2.2 AA. Accessibility settings work before login (font: system, Atk
 - Manual screen-reader passes (NVDA, VoiceOver), precision@5 labelling (A6) and human accuracy review of Stated labels (A7) are assigned to a teammate and not yet done.
 - English only; desktop and mobile web only.
 
+## Roadmap (outside the MVP)
+
+The original project description also covers **students** and **adaptable educational resources** (learning content in formats matched to each person's interface preferences). These are out of scope for the hackathon MVP (brief C7) and are the next major area after the core job-search loop, along with partner feeds from disability-focused job boards, employer-verified accommodation profiles, reminders, and real distance filtering.
+
 ## Statistic used in the pitch
 
 "53% of Gen Z say they are neurodivergent" (Forbes, Sept 2026) traces to a 2023 ZenBusiness survey of about 1,000 people aged 18–25 who self-identified. It is not a prevalence rate and is used only as evidence of demand for flexible design.
