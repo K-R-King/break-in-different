@@ -3,7 +3,7 @@ import { useConvexAuth } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import logo from "../assets/logo.png";
 import { usePrefs } from "../a11y/prefs";
-import { PushToTalkButton } from "../voice/VoiceProvider";
+import { VoiceButton } from "../voice/live/VoiceButton";
 import { Icon } from "./Icon";
 
 const LINKS = [
@@ -39,7 +39,7 @@ export function Header() {
           </nav>
         )}
         <div className="header-actions">
-          {isAuthenticated && <PushToTalkButton />}
+          {isAuthenticated && <VoiceButton />}
           <button className="btn btn-secondary" type="button" onClick={openSettings}>
             <Icon name="access" />
             Accessibility settings

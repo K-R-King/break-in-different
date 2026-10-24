@@ -6,6 +6,7 @@ import { PrefsProvider } from "./a11y/prefs";
 import { SettingsDialog } from "./a11y/SettingsDialog";
 import { ReaderProvider } from "./voice/reader";
 import { VoiceProvider } from "./voice/VoiceProvider";
+import { LiveVoiceProvider } from "./voice/live/LiveVoice";
 import { Header } from "./components/Header";
 import { COPY } from "./copy";
 import { HomePage } from "./routes/HomePage";
@@ -39,6 +40,7 @@ export function App() {
       <PrefsProvider>
         <ReaderProvider>
           <VoiceProvider>
+          <LiveVoiceProvider>
             <a className="skip" href="#main">
               Skip to main content
             </a>
@@ -62,6 +64,7 @@ export function App() {
               </div>
             </footer>
             <SettingsDialog />
+          </LiveVoiceProvider>
           </VoiceProvider>
         </ReaderProvider>
       </PrefsProvider>

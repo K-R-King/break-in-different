@@ -31,6 +31,11 @@ export const vInterface = v.object({
   voiceNav: v.boolean(),
   reduceMotion: v.boolean(),
   contrast: v.union(v.literal("standard"), v.literal("high")),
+  // Voice control preferences (optional so existing profiles stay valid).
+  voiceGuidance: v.optional(v.union(v.literal("full"), v.literal("suggest"), v.literal("brief"))),
+  voicePatience: v.optional(v.union(v.literal("quick"), v.literal("balanced"), v.literal("patient"), v.literal("very_patient"))),
+  voiceOutput: v.optional(v.union(v.literal("speech"), v.literal("screen_reader"))),
+  voiceKey: v.optional(v.string()),
 });
 
 export const vAccommodationForm = v.object({ url: v.string(), quote: v.string() });

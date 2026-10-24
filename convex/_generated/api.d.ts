@@ -38,6 +38,7 @@ import type * as seed from "../seed.js";
 import type * as spikes from "../spikes.js";
 import type * as stt from "../stt.js";
 import type * as tts from "../tts.js";
+import type * as voice from "../voice.js";
 
 import type {
   ApiFromModules,
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   spikes: typeof spikes;
   stt: typeof stt;
   tts: typeof tts;
+  voice: typeof voice;
 }>;
 
 /**
