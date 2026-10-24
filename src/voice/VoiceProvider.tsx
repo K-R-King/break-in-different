@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -7,6 +7,7 @@ import { COPY } from "../copy";
 import { toAppError } from "../lib/errors";
 import { COMMAND_HELP, parseCommand, type VoiceCommand } from "./commands";
 import { PushToTalkRecorder, recordingSupported } from "./recorder";
+import { formatCombo, isCapturing, isModifierCode, matchesCombo, useVoiceKey, type Combo } from "./hotkey";
 import { Icon } from "../components/Icon";
 
 type PageHandlers = Partial<Record<Exclude<VoiceCommand["type"], "navigate" | "help" | "scrollDown" | "scrollUp">, () => void>>;
@@ -22,6 +23,16 @@ interface VoiceCtx {
 }
 
 const Ctx = createContext<VoiceCtx | null>(null);
+
+// Long transcripts are cut so the message under the button stays short.
+const clip = (t: string, max = 80) => (t.length > max ? `${t.slice(0, max).trimEnd()}…` : t);
+
+// Pages with their own scrolling column mark it with data-voice-scroll; otherwise the window scrolls.
+function scrollPage(direction: 1 | -1) {
+  const el = document.querySelector<HTMLElement>("[data-voice-scroll]");
+  if (el && el.scrollHeight > el.clientHeight) el.scrollBy({ top: direction * el.clientHeight * 0.8, behavior: "smooth" });
+  else window.scrollBy({ top: direction * window.innerHeight * 0.8, behavior: "smooth" });
+}
 
 // Push-to-talk voice navigation. Audio goes to Cartesia speech-to-text through a Convex action.
 export function VoiceProvider({ children }: { children: ReactNode }) {
@@ -50,10 +61,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           setHelpOpen(true);
           return true;
         case "scrollDown":
-          window.scrollBy({ top: window.innerHeight * 0.8, behavior: "smooth" });
+          scrollPage(1);
           return true;
         case "scrollUp":
-          window.scrollBy({ top: -window.innerHeight * 0.8, behavior: "smooth" });
+          scrollPage(-1);
           return true;
         default: {
           const h = handlers.current[cmd.type];
@@ -75,7 +86,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     try {
       await recorder.current.start();
       setState("listening");
-      setMessage(COPY.voice.listening);
+      setMessage("");
       announce(COPY.voice.listening);
     } catch {
       setMessage("Microphone access was blocked. Allow it in your browser, or use the keyboard.");
@@ -86,7 +97,6 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const finish = useCallback(async () => {
     if (state !== "listening") return;
     setState("working");
-    setMessage(COPY.voice.working);
     const rec = await recorder.current.stop();
     if (!rec) {
       setState("idle");
@@ -97,10 +107,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       const text = await transcribe(rec.audio, rec.mimeType);
       const cmd = parseCommand(text);
       if (cmd && run(cmd)) {
-        setMessage(`Heard "${text}".`);
-        announce(`Heard ${text}`);
+        setMessage(`Heard "${clip(text)}".`);
+        announce(`Heard ${clip(text)}`);
       } else {
-        const m = text ? COPY.voice.notUnderstood(text) : "We did not catch that. Try again.";
+        const m = text ? COPY.voice.notUnderstood(clip(text)) : "We did not catch that. Try again.";
         setMessage(m);
         announce(m);
       }
@@ -112,6 +122,13 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       setState("idle");
     }
   }, [announce, run, state, transcribe]);
+
+  // The message is also announced, so it can clear itself after a while.
+  useEffect(() => {
+    if (!message) return;
+    const t = window.setTimeout(() => setMessage(""), 8000);
+    return () => window.clearTimeout(t);
+  }, [message]);
 
   const register = useCallback((h: PageHandlers) => {
     handlers.current = h;
@@ -153,56 +170,117 @@ export function useVoiceHandlers(h: PageHandlers) {
   );
 }
 
-// Hold the button (pointer, or Space/Enter on the keyboard) to talk; release to send.
+// aria-keyshortcuts uses key names: "Control+Space", "Alt+Shift+K".
+function ariaShortcut(c: Combo): string {
+  const key = c.code.startsWith("Key") ? c.code.slice(3) : c.code.startsWith("Digit") ? c.code.slice(5) : c.code;
+  return [c.ctrl && "Control", c.alt && "Alt", c.shift && "Shift", c.meta && "Meta", key].filter(Boolean).join("+");
+}
+
+// Talk by holding the button or the shortcut (default Ctrl+Space), or in toggle mode press once to
+// start and again to stop. The shortcut works anywhere on the page because it needs a modifier.
 export function PushToTalkButton() {
   const { state, message, start, finish } = useVoice();
+  const { combo, mode } = useVoiceKey();
   const descId = useId();
   const held = useRef(false);
-  const down = () => {
+  const latest = useRef({ state, start, finish, mode });
+  latest.current = { state, start, finish, mode };
+  const shortcut = formatCombo(combo);
+
+  const down = useCallback(() => {
     if (held.current) return;
     held.current = true;
-    void start();
-  };
-  const up = () => {
+    void latest.current.start();
+  }, []);
+  const up = useCallback(() => {
     if (!held.current) return;
     held.current = false;
-    void finish();
+    void latest.current.finish();
+  }, []);
+  const toggle = useCallback(() => {
+    if (latest.current.state === "idle") void latest.current.start();
+    else if (latest.current.state === "listening") void latest.current.finish();
+  }, []);
+
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => {
+      if (isCapturing() || e.repeat || !matchesCombo(e, combo)) return;
+      e.preventDefault();
+      if (latest.current.mode === "toggle") toggle();
+      else down();
+    };
+    // Hold mode: letting go of the main key or any of its modifiers sends the recording.
+    const onUp = (e: KeyboardEvent) => {
+      if (latest.current.mode === "hold" && held.current && (e.code === combo.code || isModifierCode(e.code))) up();
+    };
+    const onBlur = () => {
+      if (latest.current.mode === "hold") up();
+    };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [combo, down, up, toggle]);
+
+  const idleLabel = mode === "toggle" ? COPY.voice.press : COPY.voice.hold;
+  const labels = [
+    { on: state === "idle", text: idleLabel },
+    { on: state === "listening", text: mode === "toggle" ? COPY.voice.listeningToggle : COPY.voice.listening },
+    { on: state === "working", text: COPY.voice.working },
+  ];
+  const holdHandlers = {
+    onPointerDown: (e: ReactPointerEvent) => {
+      e.preventDefault();
+      down();
+    },
+    onPointerUp: up,
+    onPointerLeave: up,
+    onKeyDown: (e: ReactKeyboardEvent) => {
+      if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+        e.preventDefault();
+        down();
+      }
+    },
+    onKeyUp: (e: ReactKeyboardEvent) => {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        up();
+      }
+    },
   };
+
   return (
-    <div style={{ position: "relative", display: "inline-flex", flexDirection: "column" }}>
+    <div style={{ position: "relative", display: "inline-flex" }}>
       <button
         type="button"
         className="btn btn-secondary"
         aria-pressed={state === "listening"}
         aria-describedby={descId}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          down();
-        }}
-        onPointerUp={up}
-        onPointerLeave={up}
-        onKeyDown={(e) => {
-          if ((e.key === " " || e.key === "Enter") && !e.repeat) {
-            e.preventDefault();
-            down();
-          }
-        }}
-        onKeyUp={(e) => {
-          if (e.key === " " || e.key === "Enter") {
-            e.preventDefault();
-            up();
-          }
-        }}
+        aria-keyshortcuts={ariaShortcut(combo)}
+        {...(mode === "toggle" ? { onClick: toggle } : holdHandlers)}
         style={state === "listening" ? { borderColor: "var(--ink)", background: "var(--verified-bg)" } : undefined}
       >
         <Icon name="mic" />
-        {state === "listening" ? COPY.voice.listening : state === "working" ? COPY.voice.working : COPY.voice.hold}
+        {/* Every label sits in the same grid cell, so the button keeps one width as the state changes. */}
+        <span style={{ display: "inline-grid" }}>
+          {labels.map((l) => (
+            <span key={l.text} aria-hidden={!l.on} style={{ gridArea: "1 / 1", visibility: l.on ? "visible" : "hidden" }}>
+              {l.text}
+            </span>
+          ))}
+        </span>
+        <kbd className="kbd">{shortcut}</kbd>
       </button>
       <span id={descId} className="sr-only">
-        {COPY.voice.privacy} Say "help" to hear the commands.
+        {mode === "toggle" ? `Press ${shortcut} to start and again to stop.` : `Hold ${shortcut} or this button while you talk.`} {COPY.voice.privacy} Say
+        "help" to hear the commands.
       </span>
-      {message && (
-        <span className="small muted" style={{ maxWidth: 260, marginTop: 4 }} data-testid="voice-message">
+      {message && state === "idle" && (
+        <span className="voice-message small" data-testid="voice-message">
           {message}
         </span>
       )}
@@ -223,7 +301,7 @@ function HelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
     <dialog ref={ref} className="modal" aria-labelledby={titleId} onClose={onClose} onCancel={onClose}>
       <div className="stack" style={{ padding: 24 }}>
         <h2 id={titleId} style={{ margin: 0 }}>Voice commands</h2>
-        <p className="hint">Hold "Hold to talk", say a command, then let go. {COPY.voice.privacy}</p>
+        <p className="hint">Hold "Hold to talk" or its keyboard shortcut, say a command, then let go. You can change the shortcut, or switch to press once to start and again to stop, in Accessibility settings. {COPY.voice.privacy}</p>
         <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px" }}>
           {COMMAND_HELP.map((c) => (
             <div key={c.say} style={{ display: "contents" }}>

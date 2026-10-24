@@ -39,6 +39,7 @@ export default function ProfilePage() {
   );
   const [remotePreference, setRemotePreference] = useState<RemotePreference>("either");
   const [locationText, setLocationText] = useState("");
+  const [fullName, setFullName] = useState("");
   const [conditions, setConditions] = useState<string[]>([]);
   const [otherNeuro, setOtherNeuro] = useState("");
   const [otherDisability, setOtherDisability] = useState("");
@@ -61,6 +62,7 @@ export default function ProfilePage() {
       });
       setRemotePreference(profile.remotePreference);
       setLocationText(profile.locationText);
+      setFullName(profile.fullName ?? "");
       if (profile.updatedAt && profile.version > 0) setStatus(`${COPY.profile.saved}.`);
     }
     if (sensitive) {
@@ -97,7 +99,7 @@ export default function ProfilePage() {
     try {
       await save({
         skills, roleIds: roles, requiredAccommodations: required, preferredAccommodations: preferred,
-        interface: prefs, locationText: locationText.trim(), remotePreference,
+        interface: prefs, locationText: locationText.trim(), remotePreference, fullName: fullName.trim(),
       });
       await saveSensitive({ selected: conditions, otherNeuro: otherNeuro.trim(), otherDisability: otherDisability.trim() });
       setStatus(`${COPY.profile.saved}.`);
@@ -152,6 +154,15 @@ export default function ProfilePage() {
 
         <div className="stack" style={{ flex: "999 1 600px", minWidth: 0, gap: 24, paddingBottom: 32 }}>
           {errors.form && <div className="callout callout-error" role="alert"><Icon name="alert" />{errors.form}</div>}
+          <section className="card" aria-labelledby="name-h" style={{ gap: 10 }}>
+            <h2 id="name-h" style={{ margin: 0, fontSize: "1.4rem" }}>Your name <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></h2>
+            <div className="field">
+              <label htmlFor="full-name" className="label">Full name</label>
+              <p id="full-name-hint" className="hint">{COPY.profile.nameHint}</p>
+              <input className="input" id="full-name" type="text" autoComplete="name" maxLength={LIMITS.maxNameLength} value={fullName}
+                aria-describedby="full-name-hint" onChange={(e) => setFullName(e.target.value)} style={{ maxWidth: 420 }} />
+            </div>
+          </section>
           <ResumeSection skills={skills} setSkills={setSkills} error={errors.skills} />
 
           <section id="s2" className="card" aria-labelledby="s2-h">

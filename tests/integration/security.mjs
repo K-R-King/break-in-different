@@ -53,6 +53,7 @@ await check("user B cannot read or change user A's draft", async () => {
   await assert.rejects(b.query(api.emails.get, { draftId: d.draftId }), (e) => e.data?.code === "FORBIDDEN");
   await assert.rejects(b.mutation(api.emails.saveEdit, { draftId: d.draftId, subject: "x", body: "y" }), (e) => e.data?.code === "FORBIDDEN");
   await assert.rejects(b.mutation(api.emails.approve, { draftId: d.draftId }), (e) => e.data?.code === "FORBIDDEN");
+  await assert.rejects(b.mutation(api.emails.clear, { draftId: d.draftId }), (e) => e.data?.code === "FORBIDDEN");
 });
 await check("user B cannot change user A's application or see it in their list", async () => {
   await assert.rejects(b.mutation(api.applications.update, { applicationId: appId, status: "rejected" }), (e) => e.data?.code === "FORBIDDEN");
