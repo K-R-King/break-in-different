@@ -1,5 +1,5 @@
 # One-shot: pushes Convex functions to the self-hosted backend, sets server env vars, seeds data.
-FROM node:22-slim
+FROM node:22-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund

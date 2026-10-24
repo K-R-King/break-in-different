@@ -18,6 +18,7 @@ npm run check:integrations # optional: confirms Claude, Cartesia and Apify work 
 ```
 
 - App: http://localhost:8080
+- Demo login: `sam@example.com` / `break-in-different` (created by the seed with an empty profile: fill in Profile before finding jobs; `reset` recreates it)
 - Convex dashboard: http://localhost:6791 (log in with `./scripts/demo.sh admin-key`)
 - Health: http://127.0.0.1:3211/health
 
@@ -60,7 +61,7 @@ Server-side keys come from `.env` via `./scripts/demo.sh keys` (or `npx convex e
 | `npm run test:integration` | Ownership, unauthenticated access and the "no disability data in agent payloads" spy test (stop the agent container first; needs `AGENT_SHARED_SECRET`) |
 | `npm run build` | Typecheck, Vite build, then fail if any secret value appears in `dist/` |
 | `npm run check:integrations` | Spikes S2–S7 with the real keys: Claude extraction, conflict, PDF→skills, explanation, email drafts; Cartesia TTS timestamps and STT round trip; Apify Actor run and field names |
-| `npm run seed` / `npm run ingest` | Load DEMO + snapshot listings / run a live ingest |
+| `npm run seed` / `npm run ingest` | Load DEMO + snapshot listings and the demo login / run a live ingest |
 
 ## Architecture
 

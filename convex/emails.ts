@@ -11,6 +11,7 @@ import { draftEmailWithClaude } from "./ai/prompts";
 import { aiEnabled } from "./ai/claude";
 import { emailIsValid } from "./ai/validators";
 import { disclosureText, emailTemplate, fillTokens } from "./ai/templates";
+import { NAME_PLACEHOLDER } from "../shared/types";
 
 const vDraftArgs = {
   jobId: v.id("jobs"),
@@ -51,7 +52,10 @@ export const draft = action({
         aiUnavailable = true;
       }
     }
-    const body = fillTokens(base.body, job.applyUrl, disclosure, args.extraRequest);
+    // The name is filled in by code after any Claude call, like the disclosure and extra request.
+    const profile = await ctx.runQuery(internal.profiles.internalGet, { userId });
+    const filled = fillTokens(base.body, job.applyUrl, disclosure, args.extraRequest);
+    const body = profile?.fullName ? filled.replaceAll(NAME_PLACEHOLDER, profile.fullName) : filled;
     const draftId = await ctx.runMutation(internal.emails.insertDraft, {
       userId,
       jobId: args.jobId,
@@ -91,6 +95,17 @@ export const saveEdit = mutation({
     if (d.subject === subject && d.body === body) return null;
     // Any edit resets approval.
     await ctx.db.patch(draftId, { subject, body, edited: true, approvedAt: undefined, updatedAt: Date.now() });
+    return null;
+  },
+});
+
+// "Clear draft": empties the subject and message so the user can start from scratch. Resets approval.
+export const clear = mutation({
+  args: { draftId: v.id("emailDrafts") },
+  handler: async (ctx, { draftId }) => {
+    const userId = await requireUser(ctx);
+    assertOwner(await ctx.db.get(draftId), userId, "draft");
+    await ctx.db.patch(draftId, { subject: "", body: "", edited: true, approvedAt: undefined, updatedAt: Date.now() });
     return null;
   },
 });

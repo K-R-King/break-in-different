@@ -48,7 +48,11 @@ export interface ProfileInput {
   interface: InterfacePrefs;
   locationText: string;
   remotePreference: RemotePreference;
+  fullName?: string;
 }
+
+// Sign-off placeholder in drafted emails; replaced with the profile's full name when one is saved.
+export const NAME_PLACEHOLDER = "[Your name]";
 
 export interface Profile extends ProfileInput {
   version: number;

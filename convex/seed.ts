@@ -1,12 +1,16 @@
-// Seed data: `npx convex run seed:demo` loads the DEMO set and the listings snapshot.
+// Seed data: `npx convex run seed:demo` loads the DEMO set, the listings snapshot and the demo login.
 // The snapshot (convex/seedData/snapshot.json) is real public listings collected once by
 // scripts/build-seed.mjs; it keeps the real source links and goes through the same extraction.
+import { createAccount } from "@convex-dev/auth/server";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { DEMO_EMPLOYERS, DEMO_JOBS, demoApplyUrl } from "../shared/fixtures/demo-jobs";
 import { sha256 } from "./lib/text";
 import { EXTRACTION_VERSION } from "./ai/prompts";
 import snapshot from "./seedData/snapshot.json";
+
+// Demo login for judging. The account starts with no profile, like a fresh sign-up.
+export const DEMO_ACCOUNT = { email: "sam@example.com", password: "break-in-different" } as const;
 
 interface SnapshotFile {
   collectedAt: number;
@@ -87,10 +91,32 @@ export const demoJobs = internalMutation({
   },
 });
 
+export const demoAccountExists = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<boolean> => {
+    const account = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) => q.eq("provider", "password").eq("providerAccountId", DEMO_ACCOUNT.email))
+      .unique();
+    return account !== null;
+  },
+});
+
 export const demo = internalAction({
   args: {},
-  handler: async (ctx): Promise<{ demoInserted: number; snapshotInserted: number; snapshotCollectedAt: string }> => {
+  handler: async (
+    ctx,
+  ): Promise<{ demoInserted: number; snapshotInserted: number; snapshotCollectedAt: string; demoAccountCreated: boolean }> => {
     const demoInserted: number = await ctx.runMutation(internal.seed.demoJobs, {});
+    // Skip if it exists: createAccount throws when someone signed up with this email and another password.
+    const demoAccountCreated = !(await ctx.runQuery(internal.seed.demoAccountExists, {}));
+    if (demoAccountCreated) {
+      await createAccount(ctx, {
+        provider: "password",
+        account: { id: DEMO_ACCOUNT.email, secret: DEMO_ACCOUNT.password },
+        profile: { email: DEMO_ACCOUNT.email },
+      });
+    }
     const snap = snapshot as unknown as SnapshotFile;
     let snapshotInserted = 0;
     for (let i = 0; i < snap.listings.length; i += 50) {
@@ -103,7 +129,12 @@ export const demo = internalAction({
       snapshotInserted += r.inserted;
     }
     await ctx.scheduler.runAfter(0, internal.ingest.run.extractPending, {});
-    return { demoInserted, snapshotInserted, snapshotCollectedAt: new Date(snap.collectedAt).toISOString() };
+    return {
+      demoInserted,
+      snapshotInserted,
+      snapshotCollectedAt: new Date(snap.collectedAt).toISOString(),
+      demoAccountCreated,
+    };
   },
 });
 

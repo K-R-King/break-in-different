@@ -11,6 +11,7 @@ C1–C6 approved (C4: email + password, login only); C8 Cartesia for speech-to-t
 4. **Claude structured output (S2/S7).** Confirm with a real key that the pinned models return schema-valid JSON and that the sample PDF yields at least 8 skills.
 5. **"Delete all my data" also deletes the account.** FR7 says "Deleting the account removes…"; A15 says "a new sign-in starts empty". Implemented as: all rows and the account are removed; signing up again starts empty. Confirm.
 6. **Daily ingest cron** runs at 12:00 UTC (05:00 PT). If live data should not change during judging, disable it in `convex/crons.ts` before the demo.
+7. **HR contact email from scraped listings** (QA doc, 2026-10-24). Requested so the email's "To" field fills itself. Not built: the Greenhouse and Lever job APIs (and the Apify Actor) return no recruiter or HR address, few listings contain one, and the brief and UI say "We do not look up contacts". Collecting contact details would also need Roman's terms review in `docs/sources.md`. One option: prefill only when an address appears word for word in the listing text, labelled as such. Needs a team decision.
 
 ## Provisional implementation choices (flagged for review)
 
@@ -19,4 +20,6 @@ C1–C6 approved (C4: email + password, login only); C8 Cartesia for speech-to-t
 - Generic "Software Engineer" titles count as adjacent to Full Stack Developer; "Data Scientist" and "Applied Scientist" as adjacent to ML Engineer.
 - Default font is the system sans-serif (brief); the designs' Public Sans was not bundled.
 - Push-to-talk is shown whenever signed in (designs); the "Voice control" preference is stored for suggestions and the profile checklist.
+- The "Hold to talk" keyboard shortcut and mode are saved per device (local storage), not in the profile: keyboards differ between devices, and it avoids a change to `vInterface`.
+- Contract additions (2026-10-24, QA fixes): optional `fullName` on profiles and `profiles.save` (omitted keeps the saved name, "" removes it); drafted emails replace `[Your name]` with it in code after any Claude call; new `emails.clear` mutation (owner-checked) empties a draft and resets approval.
 - Contract additions: `STT_UNAVAILABLE` error code, `voiceReader` interface preference, `note`/`contradicts` on `AccommodationInfo`, `experienceLevel` on jobs, `matches.list` takes `workSetup` (remote | onsite | any) instead of `remoteOnly`, `account.deleteAll` is a mutation (atomic) rather than an action.

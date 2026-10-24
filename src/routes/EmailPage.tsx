@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ACCOMMODATION_CODES, ACCOMMODATION_HINTS, ACCOMMODATION_LABELS, CONDITION_LABELS, CONDITIONS, type AccommodationCode } from "../../shared/taxonomy";
+import { NAME_PLACEHOLDER } from "../../shared/types";
 import { COPY } from "../copy";
 import { PageHeading, useDocumentTitle } from "../a11y/PageHeading";
 import { useAnnounce } from "../a11y/Announcer";
@@ -22,6 +23,7 @@ export default function EmailPage() {
   const draftAction = useAction(api.emails.draft);
   const saveEdit = useMutation(api.emails.saveEdit);
   const approve = useMutation(api.emails.approve);
+  const clearDraft = useMutation(api.emails.clear);
   const markApplied = useMutation(api.applications.markApplied);
   const announce = useAnnounce();
   const navigate = useNavigate();
@@ -41,6 +43,8 @@ export default function EmailPage() {
   const [error, setError] = useState("");
   const [askApplied, setAskApplied] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [optionsChanged, setOptionsChanged] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const init = useRef(false);
   const autoDrafted = useRef(false);
   const awayToEmployer = useRef(false);
@@ -79,6 +83,7 @@ export default function EmailPage() {
         conditions: disclose ? conditions : [], disclosureFreeText: disclose ? disclosureText : "", extraRequest: extra,
       });
       setDirty(false);
+      setOptionsChanged(false);
       const n = r.aiUnavailable ? COPY.common.aiUnavailable : r.generatedBy === "template" ? "We used our standard template for this draft." : "";
       setNotice(n);
       announce(`Draft ready, review it. ${n}`);
@@ -116,11 +121,17 @@ export default function EmailPage() {
   }, [announce]);
 
   const approved = !!latest?.approvedAt && !dirty;
+  const needsName = !!latest && body.includes(NAME_PLACEHOLDER);
+  const cleared = !!latest && !latest.subject && !latest.body;
+  const sameCodes = (a: string[], b: string[]) => a.length === b.length && a.every((c) => b.includes(c));
+  // The draft is out of date once the choices on the left no longer match what it was written from.
+  const stale = !!latest && !cleared && !busy && (!sameCodes(codes, latest.accommodationCodes) || disclose !== latest.disclosed || optionsChanged);
 
-  const persistEdit = async () => {
+  const persistEdit = async (fromApprove = false) => {
     if (!latest || !dirty) return true;
     if (!subject.trim() || !body.trim()) {
-      setError("Subject and message cannot be empty.");
+      // While writing from scratch, wait until both are filled in; Approve says what is missing.
+      if (fromApprove) setError("Add a subject and a message before approving.");
       return false;
     }
     try {
@@ -134,14 +145,44 @@ export default function EmailPage() {
   };
 
   const onApprove = async () => {
-    if (!latest) return;
-    if (!(await persistEdit())) return;
+    if (!latest || needsName) return;
+    if (!(await persistEdit(true))) return;
     try {
       await approve({ draftId: latest._id });
       announce("Approved. You can copy or open it now.");
     } catch (e) {
       setError(toAppError(e).message);
     }
+  };
+
+  const onClear = async () => {
+    setConfirmClear(false);
+    if (!latest) return;
+    try {
+      await clearDraft({ draftId: latest._id });
+      setSubject("");
+      setBody("");
+      setDirty(false);
+      setNotice("");
+      announce("Draft cleared. Write your own, or press Write a new draft.");
+      document.getElementById("subj")?.focus();
+    } catch (e) {
+      setError(toAppError(e).message);
+    }
+  };
+
+  const useMyName = () => {
+    if (!profile?.fullName) return;
+    setBody((b) => b.replaceAll(NAME_PLACEHOLDER, profile.fullName!));
+    setDirty(true);
+    announce(`Signed with ${profile.fullName}.`);
+  };
+  const selectPlaceholder = () => {
+    const el = document.getElementById("body") as HTMLTextAreaElement | null;
+    const at = body.indexOf(NAME_PLACEHOLDER);
+    if (!el || at < 0) return;
+    el.focus();
+    el.setSelectionRange(at, at + NAME_PLACEHOLDER.length);
   };
 
   const onCopy = async () => {
@@ -211,7 +252,7 @@ export default function EmailPage() {
             <div className="field">
               <label htmlFor="extra" className="label">Anything else, in your own words <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
               <p id="extra-hint" className="hint">Added to the email exactly as you write it.</p>
-              <textarea id="extra" className="input" rows={2} maxLength={500} value={extra} aria-describedby="extra-hint" onChange={(e) => setExtra(e.target.value)} />
+              <textarea id="extra" className="input" rows={2} maxLength={500} value={extra} aria-describedby="extra-hint" onChange={(e) => { setExtra(e.target.value); setOptionsChanged(true); }} />
             </div>
           </section>
 
@@ -234,7 +275,7 @@ export default function EmailPage() {
                 <div className="grid-auto" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: "0 12px" }}>
                   {CONDITIONS.map((c) => (
                     <label key={c} className="ck">
-                      <input type="checkbox" checked={conditions.includes(c)} onChange={(e) => setConditions((x) => (e.target.checked ? [...x, c] : x.filter((y) => y !== c)))} />
+                      <input type="checkbox" checked={conditions.includes(c)} onChange={(e) => { setConditions((x) => (e.target.checked ? [...x, c] : x.filter((y) => y !== c))); setOptionsChanged(true); }} />
                       <span>{CONDITION_LABELS[c]}</span>
                     </label>
                   ))}
@@ -242,13 +283,16 @@ export default function EmailPage() {
                 <div className="field" style={{ marginTop: 10 }}>
                   <label htmlFor="dis-free" className="label">Or write it your way</label>
                   <p id="dis-free-hint" className="hint">If you write something here, it is used instead of the boxes above, exactly as written.</p>
-                  <input id="dis-free" className="input" maxLength={500} value={disclosureText} aria-describedby="dis-free-hint" onChange={(e) => setDisclosureText(e.target.value)} />
+                  <input id="dis-free" className="input" maxLength={500} value={disclosureText} aria-describedby="dis-free-hint" onChange={(e) => { setDisclosureText(e.target.value); setOptionsChanged(true); }} />
                 </div>
               </fieldset>
             )}
-            <button className="btn btn-secondary" type="button" onClick={() => void generate()} disabled={busy} style={{ alignSelf: "flex-start" }}>
-              {busy ? "Drafting…" : latest ? "Write a new draft" : "Write my draft"}
-            </button>
+            {/* Once a draft exists, "Write a new draft" sits with the draft (and lights up when it is out of date). */}
+            {!latest && (
+              <button className="btn btn-primary" type="button" onClick={() => void generate()} disabled={busy} style={{ alignSelf: "flex-start" }}>
+                {busy ? "Drafting…" : "Write my draft"}
+              </button>
+            )}
           </section>
         </div>
 
@@ -257,19 +301,36 @@ export default function EmailPage() {
             <h2 id="draft-h" style={{ margin: 0, fontSize: "1.3rem" }}>Your draft</h2>
             <p role="status" className="row" style={{ margin: 0, fontWeight: 600, gap: 8 }}>
               {approved && <Icon name="check" strokeWidth={2.6} />}
-              {busy ? "Drafting…" : !latest ? "No draft yet" : approved ? "Approved. You can copy or open it now." : "Draft ready. Review it, then approve."}
+              {busy ? "Drafting…" : !latest ? "No draft yet" : cleared ? "Cleared. Write your own, or write a new draft." : stale ? "Out of date. Write a new draft to apply your changes." : approved ? "Approved. You can copy or open it now." : "Draft ready. Review it, then approve."}
             </p>
           </div>
+          {latest && (
+            <div className="row" style={{ gap: 8 }}>
+              <button className={`btn ${stale || cleared ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => void generate()} disabled={busy}>
+                <Icon name="refresh" size={18} />{busy ? "Drafting…" : COPY.email.rewrite}
+              </button>
+              <button className="btn btn-ghost" type="button" onClick={() => setConfirmClear(true)} disabled={busy || cleared}>
+                <Icon name="x" size={18} />Clear draft
+              </button>
+            </div>
+          )}
+          {stale && (
+            <div className="callout callout-info" data-testid="draft-stale">
+              <Icon name="info" />
+              <span>
+                You changed what to ask for or what to share{disclose !== latest?.disclosed && disclose && conditionLabels.length ? ` (disclosure: ${conditionLabels.join(", ")})` : ""}. This draft does not include it yet. Press "{COPY.email.rewrite}" to update it.
+              </span>
+            </div>
+          )}
           {notice && <div className="callout callout-warn"><Icon name="info" /><span>{notice}</span></div>}
 
-          {latest && (
+          {latest && !cleared && (
             <div className="panel" style={{ background: "var(--ground)", padding: "14px 16px" }}>
               <p style={{ margin: 0, fontWeight: 700 }}>This draft shares:</p>
               <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
                 <li>{shared.length} accommodation{shared.length === 1 ? "" : "s"}: {shared.map((c) => ACCOMMODATION_LABELS[c].toLowerCase()).join(", ")}</li>
                 <li>{latest.disclosed ? `Disclosure on: ${latest.disclosedConditions.includes("free_text") ? "your own words" : latest.disclosedConditions.map((c) => CONDITION_LABELS[c as keyof typeof CONDITION_LABELS] ?? c).join(", ")} (only what you picked)` : "No condition or diagnosis"}</li>
               </ul>
-              {disclose !== latest.disclosed && <p className="small" style={{ margin: "6px 0 0" }}>You changed the disclosure choice. Press "Write a new draft" to apply it{disclose && conditionLabels.length ? ` (${conditionLabels.join(", ")})` : ""}.</p>}
             </div>
           )}
 
@@ -287,11 +348,28 @@ export default function EmailPage() {
               <label htmlFor="body" className="label">Message</label>
               <DictateButton disabled={!latest} onText={(t) => { setBody((b) => `${b}${b.endsWith("\n") || !b ? "" : " "}${t}`); setDirty(true); }} />
             </div>
-            <textarea id="body" className="input" rows={14} value={body} disabled={!latest} onChange={(e) => { setBody(e.target.value); setDirty(true); }} onBlur={() => void persistEdit()} />
+            <textarea id="body" className="input" rows={14} value={body} disabled={!latest} aria-invalid={needsName || undefined} aria-describedby={needsName ? "name-why" : undefined}
+              onChange={(e) => { setBody(e.target.value); setDirty(true); }} onBlur={() => void persistEdit()} />
+            {needsName && (
+              <div id="name-why" className="callout callout-warn" data-testid="name-placeholder">
+                <Icon name="alert" />
+                <div className="stack" style={{ gap: 8 }}>
+                  <span>
+                    The sign-off still says <strong>{NAME_PLACEHOLDER}</strong>. Replace it with your name before you approve.
+                    {!profile?.fullName && <> Add your full name in <Link to="/profile">your profile</Link> to fill it in on every draft.</>}
+                  </span>
+                  <span className="row" style={{ gap: 8 }}>
+                    {profile?.fullName && <button className="btn btn-primary btn-sm" type="button" onClick={useMyName}>Sign as {profile.fullName}</button>}
+                    <button className="btn btn-secondary btn-sm" type="button" onClick={selectPlaceholder}>Select {NAME_PLACEHOLDER} in the message</button>
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="row">
-            <button className="btn btn-primary btn-lg" type="button" onClick={() => void onApprove()} disabled={!latest || busy || approved} style={{ minHeight: 52 }}>
+            <button className="btn btn-primary btn-lg" type="button" onClick={() => void onApprove()} disabled={!latest || busy || approved || needsName}
+              aria-describedby={needsName ? "name-why" : undefined} style={{ minHeight: 52 }}>
               {approved ? "Approved" : "Approve draft"}
             </button>
             <button className="btn btn-secondary" type="button" disabled={!approved} aria-describedby={!approved ? "lock-why" : undefined} onClick={() => void onCopy()}>
@@ -328,7 +406,36 @@ export default function EmailPage() {
           )}
         </section>
       </div>
+      <ConfirmClear open={confirmClear} onCancel={() => setConfirmClear(false)} onConfirm={() => void onClear()} />
     </main>
+  );
+}
+
+// Clearing wipes the user's edits, so it asks first. Cancel is focused by default.
+function ConfirmClear({ open, onCancel, onConfirm }: { open: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) {
+      d.showModal();
+      cancelRef.current?.focus();
+    }
+    if (!open && d.open) d.close();
+  }, [open]);
+  return (
+    <dialog ref={ref} className="modal" aria-labelledby={titleId} onClose={onCancel} onCancel={onCancel}>
+      <div className="stack" style={{ padding: 24 }}>
+        <h2 id={titleId} style={{ margin: 0 }}>Clear this draft?</h2>
+        <p style={{ margin: 0 }}>This empties the subject and message, including your edits, and you will need to approve again. Your choices on the left stay as they are.</p>
+        <div className="row" style={{ justifyContent: "flex-end" }}>
+          <button ref={cancelRef} className="btn btn-secondary" type="button" onClick={onCancel}>Keep my draft</button>
+          <button className="btn btn-primary" type="button" onClick={onConfirm}>Clear draft</button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 

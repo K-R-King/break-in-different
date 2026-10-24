@@ -148,6 +148,7 @@ export type FontOption = (typeof FONT_OPTIONS)[number];
 export const LIMITS = {
   maxSkills: 60,
   maxSkillLength: 60,
+  maxNameLength: 100,
   resumeMaxBytes: 5 * 1024 * 1024,
   resumeMaxPages: 10,
   ttsMaxChars: 1500,

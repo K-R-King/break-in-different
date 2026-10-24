@@ -98,6 +98,7 @@ export default defineSchema({
     interface: vInterface,
     locationText: v.string(),
     remotePreference: vRemotePreference,
+    fullName: v.optional(v.string()), // signs accommodation emails; filled in by code, never sent to Claude
     consent: v.optional(v.object({ resumeProcessing: v.boolean(), at: v.number() })),
     version: v.number(),
     updatedAt: v.number(),

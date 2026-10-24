@@ -57,6 +57,7 @@ export const COPY = {
     fixCount: (n: number) => (n === 1 ? "1 thing to fix" : `${n} things to fix`),
   },
   profile: {
+    nameHint: "Signs your accommodation emails. It is added by the app and never sent to the AI.",
     title: "Your profile",
     saved: "Profile saved",
     resumeConsent: "Send this resume to an AI service to extract skills.",
@@ -91,6 +92,7 @@ export const COPY = {
     recipientHint: "Add the recruiter or HR address yourself. We do not look up contacts.",
     lockWhy: "Approve the draft to copy it or open it in your mail app. Editing after approval asks you to approve again.",
     discloseHint: "You never have to. If you choose Yes, you pick exactly what the email says.",
+    rewrite: "Write a new draft",
   },
   tracker: {
     title: "Application tracker",
@@ -100,7 +102,9 @@ export const COPY = {
   },
   voice: {
     hold: "Hold to talk",
+    press: "Press to talk",
     listening: "Listening…",
+    listeningToggle: "Listening… press to stop",
     working: "Working…",
     privacy: "Your recording is sent to Cartesia to turn it into text. It is not stored.",
     unsupported: "Voice input is not available in this browser. Use the keyboard instead.",

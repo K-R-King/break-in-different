@@ -15,6 +15,7 @@ const vProfileInput = {
   interface: vInterface,
   locationText: v.string(),
   remotePreference: vRemotePreference,
+  fullName: v.optional(v.string()), // omitted: keep the saved name; "": remove it
 };
 
 export const get = query({
@@ -40,6 +41,9 @@ export const save = mutation({
       fail("VALIDATION", `Each skill must be ${LIMITS.maxSkillLength} characters or fewer.`, { field: "skills" });
     validateInterface(args.interface);
     if (args.locationText.length > 100) fail("VALIDATION", "Keep the location to 100 characters.", { field: "locationText" });
+    const { fullName, ...rest } = args;
+    if (fullName !== undefined && fullName.trim().length > LIMITS.maxNameLength)
+      fail("VALIDATION", `Keep your name to ${LIMITS.maxNameLength} characters.`, { field: "fullName" });
     const preferred = args.preferredAccommodations.filter((c) => !args.requiredAccommodations.includes(c));
 
     const existing = await ctx.db
@@ -47,7 +51,8 @@ export const save = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
     const doc = {
-      ...args,
+      ...rest,
+      ...(fullName !== undefined && { fullName: fullName.trim() || undefined }),
       skills,
       roleIds: dedupe(args.roleIds),
       requiredAccommodations: dedupe(args.requiredAccommodations),

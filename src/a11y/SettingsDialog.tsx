@@ -1,7 +1,10 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { usePrefs } from "./prefs";
 import { Icon } from "../components/Icon";
 import type { InterfacePrefs } from "../../shared/types";
+import {
+  comboConflict, comboFromEvent, comboProblem, DEFAULT_VOICE_KEY, formatCombo, isModifierCode, setCapturing, setVoiceKey, useVoiceKey,
+} from "../voice/hotkey";
 
 const FONT_LABELS: Record<InterfacePrefs["font"], string> = {
   system: "System sans-serif (default)",
@@ -113,6 +116,8 @@ export function SettingsDialog() {
             <Toggle label="Voice control (hold to talk)" checked={prefs.voiceNav} onChange={(v) => update({ voiceNav: v })} />
             <Toggle label="Reduce motion" checked={prefs.reduceMotion} onChange={(v) => update({ reduceMotion: v })} />
           </fieldset>
+
+          <VoiceShortcutSettings />
         </div>
         <div className="row" style={{ justifyContent: "space-between", padding: "16px 24px", borderTop: "1px solid var(--line)" }}>
           <button className="btn btn-secondary" type="button" onClick={reset}>Reset to default</button>
@@ -129,5 +134,90 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       <span>{label}</span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ width: 22, height: 22, accentColor: "var(--accent)" }} />
     </label>
+  );
+}
+
+// "Hold to talk" shortcut: record a new combo, pick hold or toggle, reset. Saved on this device.
+function VoiceShortcutSettings() {
+  const { combo, mode } = useVoiceKey();
+  const [recording, setRecording] = useState(false);
+  const [problem, setProblem] = useState("");
+  const changeRef = useRef<HTMLButtonElement>(null);
+  const hintId = useId();
+  const statusId = useId();
+  const conflict = comboConflict(combo);
+  const isDefault = formatCombo(combo) === formatCombo(DEFAULT_VOICE_KEY.combo) && mode === DEFAULT_VOICE_KEY.mode;
+
+  const stopRecording = () => {
+    setRecording(false);
+    setCapturing(false);
+  };
+  useEffect(() => () => setCapturing(false), []);
+
+  return (
+    <fieldset style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+      <legend style={{ paddingTop: 8 }}>Hold to talk</legend>
+      <div className="stack" style={{ gap: 12 }}>
+        <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
+          <span>
+            Keyboard shortcut: <kbd className="kbd" style={{ fontSize: "0.9rem" }}>{formatCombo(combo)}</kbd>
+          </span>
+          <button
+            ref={changeRef}
+            className="btn btn-secondary btn-sm"
+            type="button"
+            aria-describedby={`${hintId} ${statusId}`}
+            onClick={() => {
+              setProblem("");
+              setRecording(true);
+              setCapturing(true);
+            }}
+            onBlur={() => recording && stopRecording()}
+            onKeyDown={(e) => {
+              if (!recording) return;
+              // Swallow every key while recording, including Esc, so the dialog stays open.
+              e.preventDefault();
+              e.stopPropagation();
+              if (isModifierCode(e.code)) return;
+              if (e.key === "Escape" && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+                stopRecording();
+                return;
+              }
+              const next = comboFromEvent(e);
+              const why = comboProblem(next);
+              if (why) {
+                setProblem(why);
+                return;
+              }
+              setVoiceKey({ combo: next, mode });
+              setProblem("");
+              stopRecording();
+            }}
+            style={recording ? { borderColor: "var(--ink)", background: "var(--verified-bg)" } : undefined}
+          >
+            {recording ? "Press your keys… (Esc to cancel)" : "Change"}
+          </button>
+        </div>
+        <p id={hintId} className="hint">Use Ctrl, Alt (Option) or Cmd with another key, or a function key, so it never fires while you type.</p>
+        <div id={statusId} role="status">
+          {problem && <p className="field-error" style={{ margin: 0 }}><Icon name="alert" size={18} />{problem}</p>}
+          {!problem && conflict && (
+            <div className="callout callout-warn small"><Icon name="alert" size={18} /><span>{conflict}. It may not reach this page. Choose another shortcut if it does not work.</span></div>
+          )}
+        </div>
+        <div className="stack" style={{ gap: 8 }}>
+          {([["hold", "Hold the keys while you talk"], ["toggle", "Press once to start, press again to stop"]] as const).map(([m, label]) => (
+            <label key={m} className="check" style={{ alignItems: "center", padding: "8px 14px" }}>
+              <input type="radio" name="talk-mode" checked={mode === m} onChange={() => setVoiceKey({ combo, mode: m })} />
+              {label}
+            </label>
+          ))}
+        </div>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={isDefault} style={{ alignSelf: "flex-start" }}
+          onClick={() => { setVoiceKey(DEFAULT_VOICE_KEY); setProblem(""); changeRef.current?.focus(); }}>
+          Reset shortcut to {formatCombo(DEFAULT_VOICE_KEY.combo)}, hold
+        </button>
+      </div>
+    </fieldset>
   );
 }

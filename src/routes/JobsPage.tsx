@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -14,6 +14,8 @@ import { Icon } from "../components/Icon";
 import { HighlightedText, useReader } from "../voice/reader";
 import { useVoiceHandlers } from "../voice/VoiceProvider";
 import { toAppError } from "../lib/errors";
+
+const MIN_COLUMN_HEIGHT = 360;
 
 type Item = NonNullable<ReturnType<typeof useQuery<typeof api.matches.list>>>["items"][number];
 
@@ -128,8 +130,33 @@ export default function JobsPage() {
 
   const incomplete = profile !== undefined && (!profile || !profile.skills.length || !profile.roleIds.length);
 
+  // Wide screens: the page stops scrolling and each column scrolls on its own (styles in base.css).
+  // Only when the columns still get a useful height; with large text the page scrolls as usual.
+  const layoutRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (incomplete) return;
+    const root = document.documentElement;
+    const check = () => {
+      const el = layoutRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const footer = document.querySelector(".footer")?.getBoundingClientRect().height ?? 0;
+      if (window.innerHeight - top - footer - 16 >= MIN_COLUMN_HEIGHT) root.dataset.layout = "fit";
+      else delete root.dataset.layout;
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    for (const el of [document.querySelector(".site-header"), layoutRef.current?.previousElementSibling]) if (el) ro.observe(el);
+    window.addEventListener("resize", check);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", check);
+      delete root.dataset.layout;
+    };
+  }, [incomplete]);
+
   return (
-    <main id="main" className="container" style={{ paddingBlock: "32px 48px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
+    <main id="main" className="container jobs-page" style={{ paddingBlock: "32px 48px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end", gap: "16px 32px" }}>
         <div>
           <PageHeading>{COPY.jobs.title}</PageHeading>
@@ -153,8 +180,8 @@ export default function JobsPage() {
           <Link className="btn btn-primary" to="/profile" style={{ alignSelf: "flex-start" }}>Go to your profile</Link>
         </div>
       ) : (
-        <div className="sidebar-layout">
-          <aside className="side" aria-labelledby="flt-h">
+        <div className="jobs-layout" ref={layoutRef}>
+          <aside className="jobs-col side" aria-labelledby="flt-h">
             <div className="panel stack" style={{ gap: 18 }}>
               <h2 id="flt-h" style={{ margin: 0, fontSize: "1.2rem" }}>Filters</h2>
               <fieldset>
@@ -203,8 +230,8 @@ export default function JobsPage() {
             </div>
           </aside>
 
-          <section className="main" aria-labelledby="res-h" aria-busy={running || data === undefined}>
-            <div className="row" style={{ justifyContent: "space-between" }}>
+          <section className="jobs-col main" aria-labelledby="res-h" aria-busy={running || data === undefined} data-voice-scroll>
+            <div className="row jobs-results-bar" style={{ justifyContent: "space-between" }}>
               <h2 id="res-h" style={{ margin: 0, fontSize: "1.2rem" }}>
                 {running || data === undefined ? COPY.jobs.finding : `${items.length} jobs found`}
               </h2>
@@ -255,13 +282,21 @@ function JobCard({ it, selected, onSelect, onToggleSave, onRead }: { it: Item; s
   const stale = Date.now() - it.job.fetchedAt > LIMITS.staleListingHours * 3600_000;
   const f = it.factors;
   const unverifiedRequired = c.requiredNotMentioned.filter((code) => it.job.accommodations.some((a: AccommodationInfo) => a.code === code && a.label === "unverified")).length;
+  // A click anywhere on the card (outside its buttons and links, and not while selecting text) selects it.
+  // Keyboard and screen reader users get the same through the title link.
+  const onCardClick = (e: MouseEvent<HTMLElement>) => {
+    if ((e.target as HTMLElement).closest("a, button, input, label, summary, select, textarea")) return;
+    if (window.getSelection()?.toString()) return;
+    onSelect();
+  };
   return (
-    <article id={`job-${it.jobId}`} tabIndex={-1} aria-labelledby={`jt-${it.jobId}`} aria-current={selected ? "true" : undefined}
-      className="stack" style={{ background: "var(--surface)", border: selected ? "3px solid var(--ink)" : "1px solid var(--line)", borderRadius: 18, padding: selected ? 18 : 20, gap: 12 }}>
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- mouse shortcut; the title link is the keyboard path
+    <article id={`job-${it.jobId}`} tabIndex={-1} aria-labelledby={`jt-${it.jobId}`} aria-current={selected ? "true" : undefined} onClick={onCardClick}
+      className="stack job-card" style={{ background: "var(--surface)", border: selected ? "3px solid var(--ink)" : "1px solid var(--line)", borderRadius: 18, padding: selected ? 18 : 20, gap: 12 }}>
       <div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap", gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3 id={`jt-${it.jobId}`} style={{ margin: 0, fontSize: "1.18rem" }}>
-            <a href="#detail" onClick={(e) => { e.preventDefault(); onSelect(); setTimeout(() => document.getElementById("detail-heading")?.focus(), 0); }} style={{ color: "var(--ink)", textDecoration: "none" }}>{it.job.title}</a>
+            <a href="#detail" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSelect(); setTimeout(() => document.getElementById("detail-heading")?.focus(), 0); }} style={{ color: "var(--ink)", textDecoration: "none" }}>{it.job.title}</a>
           </h3>
           <div className="row small muted" style={{ gap: "4px 14px", marginTop: 4 }}>
             <span style={{ fontWeight: 700, color: "var(--ink)" }}>{it.job.employerName}</span>
@@ -315,7 +350,7 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
   const { prefs } = usePrefs();
   const [full, setFull] = useState(false);
   const reading = reader.jobId === jobId && reader.status !== "idle";
-  if (!job) return <section className="detail panel" aria-busy="true" role="status">Loading job…</section>;
+  if (!job) return <section className="jobs-col detail panel" aria-busy="true" role="status">Loading job…</section>;
 
   const codes = [...new Set([...required, ...preferred, ...job.accommodations.map((a) => a.code)])] as (typeof ACCOMMODATION_CODES)[number][];
   const summary = job.summary || job.descriptionText.slice(0, 280);
@@ -327,7 +362,7 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
   const readText = full || prefs.voiceReader ? job.descriptionText : summary;
 
   return (
-    <section id="detail" aria-labelledby="detail-heading" className="detail panel stack" style={{ padding: 26, gap: 18 }}>
+    <section id="detail" aria-labelledby="detail-heading" className="jobs-col detail panel stack" style={{ padding: 26, gap: 18 }}>
       <div className="stack" style={{ gap: 6 }}>
         {job.isDemo && <div className="row small muted" style={{ gap: 8 }}><span className="demo">DEMO</span>{COPY.common.demoNote}</div>}
         <h2 id="detail-heading" tabIndex={-1} style={{ margin: 0, fontSize: "1.65rem", lineHeight: 1.2 }}>{job.title}</h2>

@@ -15,6 +15,7 @@ export async function signUp(page: Page, email = `e2e-${Date.now()}-${Math.round
 
 // Sam's profile: skills from pasted resume, remote + flexible required, written alternatives preferred.
 export async function buildSamProfile(page: Page) {
+  await page.getByLabel("Full name").fill("Sam Rivera"); // signs the email in place of [Your name]
   await page.getByLabel(/Send this resume to an AI service/).check();
   await page.getByRole("button", { name: "Paste text instead" }).click();
   await page.getByLabel("Paste your resume text").fill(SAMPLE_RESUME);

@@ -43,6 +43,8 @@ test("Sam completes the loop: settings → sign up → profile → jobs → emai
   await expect(page).toHaveURL(/\/email$/);
   const body = page.getByLabel("Message");
   await expect(body).toHaveValue(/Remote work options/, { timeout: 30_000 });
+  await expect(body).toHaveValue(/Sam Rivera/);
+  await expect(body).not.toHaveValue(/\[Your name\]/);
   // A10: disclosure off → only chosen accommodations, no condition; Copy disabled until Approve
   await expect(body).not.toHaveValue(/dyslexia|disability|diagnos/i);
   await expect(page.getByText("No condition or diagnosis")).toBeVisible();

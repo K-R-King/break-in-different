@@ -124,3 +124,34 @@ dialog.modal { border-radius: 18px; width: min(560px, calc(100vw - 32px)); }
 
 .footer { border-top: 1px solid var(--line); background: var(--surface); }
 .footer .container { padding-block: 20px; display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; font-size: 0.88rem; color: var(--muted); }
+
+/* Keyboard shortcut chip, e.g. on "Hold to talk" */
+.kbd { font: inherit; font-size: 0.78rem; font-weight: 700; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--ground); color: var(--muted-2); }
+
+/* Voice message: floats under the button so the header does not move */
+.voice-message { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: max-content; max-width: 280px; padding: 8px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: 0 6px 18px rgba(20, 21, 26, 0.12); color: var(--ink); }
+
+/* Jobs page: filters, results and details side by side. On wide, tall-enough screens the page itself
+   does not scroll; each column scrolls on its own. Narrow or short screens (or large text) scroll normally. */
+.jobs-layout { display: flex; flex-direction: column; gap: 24px; }
+.jobs-col.side { display: flex; flex-direction: column; gap: 16px; }
+.jobs-col.main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.jobs-col.detail { min-width: 0; }
+.job-card { cursor: pointer; }
+.job-card :is(a, button, input, label) { cursor: pointer; }
+.job-card:not([aria-current="true"]):hover { border-color: var(--line-strong) !important; box-shadow: 0 2px 10px rgba(20, 21, 26, 0.08); }
+@media (min-width: 1100px) {
+  .jobs-layout { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; }
+}
+/* data-layout="fit" is set by JobsPage only when the columns would still be at least 360px tall. */
+@media (min-width: 1100px) {
+  html[data-layout="fit"] body { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+  html[data-layout="fit"] #root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  html[data-layout="fit"] .site-header, html[data-layout="fit"] .footer { flex: none; }
+  html[data-layout="fit"] .jobs-page { flex: 1; min-height: 0; width: 100%; padding-bottom: 16px !important; }
+  html[data-layout="fit"] .jobs-page > * { flex: none; }
+  html[data-layout="fit"] .jobs-layout { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  html[data-layout="fit"] .jobs-col { position: relative; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  html[data-layout="fit"] .jobs-col.side, html[data-layout="fit"] .jobs-col.main { padding: 2px 6px 16px 2px; }
+  html[data-layout="fit"] .jobs-results-bar { position: sticky; top: -2px; z-index: 2; background: var(--ground); padding-block: 6px; }
+}
