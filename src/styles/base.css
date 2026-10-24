@@ -143,15 +143,27 @@ dialog.modal { border-radius: 18px; width: min(560px, calc(100vw - 32px)); }
 @media (min-width: 1100px) {
   .jobs-layout { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; }
 }
-/* data-layout="fit" is set by JobsPage only when the columns would still be at least 360px tall. */
+/* Fit-to-window pages: data-layout="fit" is set by useFitLayout (src/lib/useFitLayout.ts) only when the
+   window is wide enough and the scrolling columns would still be at least 360px tall. */
+html[data-layout="fit"] body { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+html[data-layout="fit"] #root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+html[data-layout="fit"] #root > * { flex: none; }
+html[data-layout="fit"] #root > main { flex: 1; min-height: 0; width: 100%; }
 @media (min-width: 1100px) {
-  html[data-layout="fit"] body { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
-  html[data-layout="fit"] #root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  html[data-layout="fit"] .site-header, html[data-layout="fit"] .footer { flex: none; }
-  html[data-layout="fit"] .jobs-page { flex: 1; min-height: 0; width: 100%; padding-bottom: 16px !important; }
+  html[data-layout="fit"] .jobs-page { padding-bottom: 16px !important; }
   html[data-layout="fit"] .jobs-page > * { flex: none; }
   html[data-layout="fit"] .jobs-layout { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
   html[data-layout="fit"] .jobs-col { position: relative; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   html[data-layout="fit"] .jobs-col.side, html[data-layout="fit"] .jobs-col.main { padding: 2px 6px 16px 2px; }
   html[data-layout="fit"] .jobs-results-bar { position: sticky; top: -2px; z-index: 2; background: var(--ground); padding-block: 6px; }
 }
+
+/* Profile: section list and progress beside the form. When the page fits the window, the form scrolls
+   on its own and the progress stays in view. */
+.profile-page { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; padding-top: 40px; }
+.profile-nav { flex: 1 1 240px; }
+.profile-form { flex: 999 1 600px; min-width: 0; gap: 24px; padding-bottom: 32px; }
+html[data-layout="fit"] .profile-page { flex-wrap: nowrap; align-items: stretch; padding-top: 24px; }
+html[data-layout="fit"] .profile-nav, html[data-layout="fit"] .profile-form { min-height: 0; overflow-y: auto; overscroll-behavior: contain; position: relative; }
+html[data-layout="fit"] .profile-nav { padding: 2px 4px 16px 2px; }
+html[data-layout="fit"] .profile-form { padding: 2px 8px 24px 2px; }
