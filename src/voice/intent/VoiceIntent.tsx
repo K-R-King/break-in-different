@@ -31,6 +31,12 @@ export function useIntentStatus(): string {
 const SELECTION_AFTER_STOP_MS = 10_000;
 const SUGGESTION_MS = 20_000; // how long "yes" can still confirm a "Did you mean …?"
 const NO = /^\W*(no|nope|no thanks|never ?mind|cancel|wrong)\W*$/i;
+
+// The last sentence or clause on its own: what was said after earlier words that went nowhere
+// ("uh, show me… scroll down"), or a correction ("scroll down, no, scroll up").
+function lastClause(text: string): string {
+  return text.split(/[.!?,;]+/).map((c) => c.trim()).filter(Boolean).at(-1) ?? "";
+}
 const STOP_LISTENING = /\b(stop listening|stop voice( control)?|turn off voice control|that's all|goodbye)\b/i;
 
 export function VoiceIntent() {
@@ -89,7 +95,9 @@ export function VoiceIntent() {
         session.stop();
         return;
       }
-      const scroll = parseScroll(text);
+      // A fresh command after words that went nowhere counts on its own.
+      const clause = lastClause(text);
+      const scroll = parseScroll(text) ?? parseScroll(lastTurn.current) ?? parseScroll(clause);
       if (scroll) {
         highlights.clearGuess();
         if (!final) return setStatus(scroll.dir < 0 ? COPY.voice.scrollingUp : COPY.voice.scrollingDown);
@@ -168,10 +176,12 @@ export function VoiceIntent() {
         return;
       }
       let m = pick(text, targets);
-      // Earlier chatter must not block a clear command: try the latest turn on its own too.
-      if (final && !m?.confident && lastTurn.current && lastTurn.current !== text) {
-        const alone = pick(lastTurn.current, targets);
-        if (alone?.confident) m = alone;
+      // Earlier chatter must not block a clear command: try the latest turn, then the latest
+      // clause, on its own too.
+      for (const alone of [lastTurn.current, clause]) {
+        if (!final || m?.confident || !alone || alone === text) continue;
+        const a = pick(alone, targets);
+        if (a?.confident) m = a;
       }
       performance.measure("voice:scan", "voice:match-start", "voice:scanned");
       performance.measure("voice:match", "voice:match-start");
@@ -179,7 +189,9 @@ export function VoiceIntent() {
         guessed.current = null;
         highlights.clearGuess();
         const here = final ? alreadyHere(text, targets) : null;
-        if (here) session.consume();
+        // Words that matched nothing are dropped once the turn really ends, so the next attempt
+        // starts fresh instead of being added to something that can never match.
+        if (here || definite) session.consume();
         setStatus(here ? COPY.voice.alreadyHere(targets[here.id].label) : final ? COPY.voice.noMatch : "");
         return;
       }

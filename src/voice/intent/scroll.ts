@@ -9,23 +9,35 @@ export type ScrollCommand = { dir: 1 | -1; amount: "step" | "page" | "bit" | "en
 
 const SHARE = { step: 0.5, bit: 0.25, page: 0.85 } as const;
 
-const END = /\b(?:scroll|go|jump|move|take me)(?: back)?(?: all the way)? (?:up |down )?to (?:the )?(top|bottom|end|start|beginning)\b/;
-const STEP = /\b(scroll|page|move|go)(?: the page)? (down|up)\b(?:(?: just)? a (?:little )?(bit|little))?/;
-const BARE = /^\s*(?:scroll )?(down|up)\s*$/; // "down", "scroll up"
+const END = /\b(?:scroll|go|jump|move|take me)(?: back)?(?: all the way)? (?:up |down )?to (?:the )?(top|bottom|end|start|beginning)\b/g;
+const STEP = /\b(scroll|page|move|go)(?: the page)? (down|up)\b(?:(?: just)? a (?:little )?(bit|little))?/g;
+const BARE = /\b(down|up)\b/g; // "down", "uh, up"
+// Hesitations, politeness and lead-ins around a command ("uh", often heard as "I"; "can you",
+// "I want to", "let me").
+const FILLER =
+  /\b(uh+|um+|uhm+|erm?|hmm+|ah+|oh|well|so|and|then|okay|ok|please|now|again|more|thanks|thank you|just|a bit|a little|scroll|i|i'd|id|i'll|want|wanna|need|would|like|to|can|could|will|you|let|let's|lets|me|us|try|the|it)\b/g;
 
-const tidy = (s: string) => s.toLowerCase().replace(/[^a-z ]+/g, " ").replace(/\s+/g, " ").trim();
+const tidy = (s: string) => s.toLowerCase().replace(/[^a-z' ]+/g, " ").replace(/\s+/g, " ").trim();
 
-// The scroll command, when that is all that was said (besides filler).
+// The scroll command when that is all that was said, besides hesitations and filler ("uh, scroll
+// down"). A command said several times in a row ("scroll down, scroll down") counts once, as the
+// last one said: repeating is impatience, not a request for three steps.
 export function parseScroll(text: string): ScrollCommand | null {
-  const s = tidy(text);
-  const rest = (m: RegExpMatchArray) => tidy(s.replace(m[0], "").replace(/\b(please|now|again|more|thanks|thank you|a bit|a little)\b/g, ""));
-  let m = s.match(END);
-  if (m && !rest(m)) return { dir: m[1] === "top" || m[1] === "start" || m[1] === "beginning" ? -1 : 1, amount: "end" };
-  m = s.match(STEP);
-  if (m && !rest(m)) return { dir: m[2] === "up" ? -1 : 1, amount: m[3] ? "bit" : m[1] === "page" ? "page" : "step" };
-  m = s.match(BARE);
-  if (m) return { dir: m[1] === "up" ? -1 : 1, amount: "step" };
-  return null;
+  let s = tidy(text);
+  const hits: { at: number; cmd: ScrollCommand }[] = [];
+  const take = (re: RegExp, cmd: (m: RegExpExecArray) => ScrollCommand) => {
+    s = s.replace(re, (...args) => {
+      const m = args.slice(0, -2) as unknown as RegExpExecArray;
+      hits.push({ at: args.at(-2) as number, cmd: cmd(m) });
+      return " ".repeat(args[0].length);
+    });
+  };
+  take(END, (m) => ({ dir: m[1] === "top" || m[1] === "start" || m[1] === "beginning" ? -1 : 1, amount: "end" }));
+  take(STEP, (m) => ({ dir: m[2] === "up" ? -1 : 1, amount: m[3] ? "bit" : m[1] === "page" ? "page" : "step" }));
+  if (!hits.length && tidy(s.replace(FILLER, "").replace(BARE, ""))) return null;
+  if (!hits.length) take(BARE, (m) => ({ dir: m[1] === "up" ? -1 : 1, amount: "step" }));
+  if (!hits.length || tidy(s.replace(FILLER, ""))) return null;
+  return hits.sort((a, b) => a.at - b.at).at(-1)!.cmd;
 }
 
 function reducedMotion(): boolean {

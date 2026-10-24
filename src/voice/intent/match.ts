@@ -98,7 +98,7 @@ const VERBS: [RegExp, Verb][] = [
 const DO = /\b(do (it|that)|yes|yeah|yep|go ahead|confirm|okay|ok|sure)\b/g;
 
 const STOP = new Set(
-  "a an the to my me of and or with when while doing for please i i'd id want would like can you could it this that these those is be on off in at up some any page button checkbox box option radio toggle switch link tab field one just only now also then so let's lets us no".split(" "),
+  "a an the to my me of and or with when while doing for please i i'd id want would like can you could it this that these those is be on off in at up some any page button checkbox box option radio toggle switch link tab field one just only now also then so let's lets us no uh uhh um umm uhm er erm hmm ah oh well".split(" "),
 );
 
 export function stem(w: string): string {
