@@ -15,6 +15,7 @@ const ProfilePage = lazy(() => import("./routes/ProfilePage"));
 const JobsPage = lazy(() => import("./routes/JobsPage"));
 const EmailPage = lazy(() => import("./routes/EmailPage"));
 const TrackerPage = lazy(() => import("./routes/TrackerPage"));
+const PracticePage = lazy(() => import("./routes/PracticePage"));
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -49,6 +50,7 @@ export function App() {
                 <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
                 <Route path="/jobs" element={<RequireAuth><JobsPage /></RequireAuth>} />
                 <Route path="/jobs/:id/email" element={<RequireAuth><EmailPage /></RequireAuth>} />
+                <Route path="/jobs/:id/practice" element={<RequireAuth><PracticePage /></RequireAuth>} />
                 <Route path="/tracker" element={<RequireAuth><TrackerPage /></RequireAuth>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

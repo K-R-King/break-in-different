@@ -376,6 +376,7 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
       <div className="row">
         <Link className="btn btn-primary btn-lg" to={`/jobs/${jobId}/email`} style={{ minHeight: 52 }}>Request accommodations and apply</Link>
         <button className="btn btn-secondary" type="button" aria-pressed={item.saved} onClick={onToggleSave}><Icon name="bookmark" size={18} filled={item.saved} />{item.saved ? "Saved" : "Save"}</button>
+        <Link className="btn btn-secondary" to={`/jobs/${jobId}/practice`}><Icon name="mic" size={18} />{COPY.practice.entry}</Link>
       </div>
 
       <div className="stack" style={{ gap: 10 }}>

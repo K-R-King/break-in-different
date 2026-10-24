@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { emailIsValid, explanationIsGrounded, verifyAccommodations } from "./validators";
-import { disclosureText, emailTemplate, fillTokens } from "./templates";
+import { emailIsValid, explanationIsGrounded, practiceLineIsValid, redactHealthTerms, verifyAccommodations } from "./validators";
+import { disclosureText, emailTemplate, fillTokens, scriptedPracticeTurn } from "./templates";
 import type { MatchFactors } from "../../shared/types";
 
 const listing = `This role is fully remote for candidates anywhere in the US.
@@ -93,5 +93,44 @@ describe("email validator (guardrail 4, A10, A11)", () => {
   it("inserts the user's extra request verbatim before the link", () => {
     const body = fillTokens("Hi\n\nMy application: [APPLICATION_LINK]", "URL", "", "a standing desk");
     expect(body).toBe("Hi\n\nI would also like to ask about: a standing desk\n\nMy application: URL");
+  });
+});
+
+describe("interview practice guardrails", () => {
+  it("removes condition words from answers, whatever the case, and keeps everything else", () => {
+    expect(redactHealthTerms("I have ADHD. My Dyslexia means I like written notes; I'm autistic."))
+      .toBe("I have [removed]. My [removed] means I like written notes; I'm [removed].");
+    expect(redactHealthTerms("Parkinson's disease runs in my family")).toBe("[removed] runs in my family");
+    expect(redactHealthTerms("I built a dashboard in React with blinding speed")).toBe("I built a dashboard in React with blinding speed");
+  });
+  it("accepts a short interviewer line and rejects links, health words and long text", () => {
+    expect(practiceLineIsValid("Thanks. Tell me about a project where you used React.")).toBe(true);
+    expect(practiceLineIsValid("Do you have a disability we should know about?")).toBe(false);
+    expect(practiceLineIsValid("Is your ADHD under control?")).toBe(false);
+    expect(practiceLineIsValid("See https://example.com for details.")).toBe(false);
+    expect(practiceLineIsValid("x".repeat(701))).toBe(false);
+    // A greeting that repeats a long job title still fits.
+    expect(practiceLineIsValid(`Hello, and welcome to this practice interview for the Senior Machine Learning Engineer, Drive role at DoorDash. We have about 4 questions and there is no time limit, so take whatever time you need. To start, could you tell me about a machine learning model you built and deployed, what problem it solved, and what your part in it was?`)).toBe(true);
+    expect(practiceLineIsValid("   ")).toBe(false);
+  });
+  it("scripted interviewer asks every question once, then closes", () => {
+    const base = { jobTitle: "Full Stack Developer", skills: ["React"] };
+    const start = scriptedPracticeTurn({ ...base, answered: 0, move: "start" });
+    expect(start.say).toContain("Tell me about yourself");
+    expect(scriptedPracticeTurn({ ...base, answered: 1, move: "answer" }).say).toContain("React");
+    expect(scriptedPracticeTurn({ ...base, answered: 3, move: "answer" }).kind).toBe("question");
+    expect(scriptedPracticeTurn({ ...base, answered: 4, move: "answer" }).kind).toBe("closing");
+    expect(scriptedPracticeTurn({ ...base, answered: 1, move: "rephrase" }).say).toMatch(/^Let me ask that another way/);
+    for (const n of [0, 1, 2, 3, 4]) expect(practiceLineIsValid(scriptedPracticeTurn({ ...base, answered: n, move: "answer" }).say)).toBe(true);
+  });
+  it("scripted interviewer asks questions shown in advance as written, in order", () => {
+    const planned = ["What drew you to this role?", "Tell me about a model you deployed.", "How do you handle feedback on your code?"];
+    const base = { jobTitle: "ML Engineer", skills: ["Python"], planned };
+    const start = scriptedPracticeTurn({ ...base, answered: 0, move: "start" });
+    expect(start.say).toContain("already seen the questions");
+    expect(start.say).toContain(planned[0]);
+    expect(scriptedPracticeTurn({ ...base, answered: 2, move: "answer" }).say).toContain(planned[2]);
+    expect(scriptedPracticeTurn({ ...base, answered: 3, move: "answer" }).kind).toBe("closing");
+    expect(scriptedPracticeTurn({ ...base, answered: 1, move: "rephrase" }).say).toBe(`Let me ask that again. ${planned[1]}`);
   });
 });
