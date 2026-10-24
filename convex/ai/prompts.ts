@@ -141,6 +141,34 @@ function transcript(history: PracticeTurn[]): string {
   return history.map((t) => `${t.role === "interviewer" ? "Interviewer" : "Candidate"}: ${redactHealthTerms(t.text)}`).join("\n");
 }
 
+// The main questions, planned up front so a candidate who asks can see them before starting.
+export async function plannedQuestions(opts: {
+  jobTitle: string;
+  employerName: string;
+  listing: string;
+  skills: string[];
+}): Promise<{ questions: string[] } | null> {
+  return structuredCall<{ questions: string[] }>({
+    role: "extract",
+    maxTokens: 600,
+    system: `You plan a practice interview for the ${opts.jobTitle} role at ${opts.employerName}. Write exactly ${PRACTICE_QUESTIONS} main questions in the order they will be asked: first an easy question about the candidate and the role, then questions about the work and skills in the listing, and one behavioral question.
+Each question is one or two short sentences, under 40 words, in plain, literal language, and makes sense on its own when read.
+${PRACTICE_SAFETY}`,
+    content: [
+      {
+        type: "text",
+        text: `Job title: ${opts.jobTitle}\nSkills in the listing: ${opts.skills.join(", ") || "not listed"}\n\n${asData("LISTING", opts.listing.slice(0, 6000))}`,
+      },
+    ],
+    schema: {
+      type: "object",
+      properties: { questions: { type: "array", items: { type: "string" } } },
+      required: ["questions"],
+      additionalProperties: false,
+    },
+  });
+}
+
 export async function interviewerTurn(opts: {
   jobTitle: string;
   employerName: string;
@@ -150,14 +178,21 @@ export async function interviewerTurn(opts: {
   history: PracticeTurn[];
   move: PracticeMove;
   mustClose: boolean;
+  plan?: string[];
 }): Promise<{ say: string; kind: "question" | "followup" | "closing" } | null> {
+  const total = opts.plan?.length || PRACTICE_QUESTIONS;
   const task = opts.mustClose
     ? "Close the interview now: thank the candidate and tell them they can ask for feedback on their answers. Do not ask another question. Use kind closing."
     : opts.move === "start"
-      ? `Greet the candidate in one sentence, say this practice has about ${PRACTICE_QUESTIONS} questions and no time limit, then ask the first question.`
+      ? opts.plan
+        ? "Greet the candidate in one sentence, say they have already seen the questions and there is no time limit, then ask planned question 1."
+        : `Greet the candidate in one sentence, say this practice has about ${total} questions and no time limit, then ask the first question.`
       : opts.move === "rephrase"
         ? "Say your last question again in different, simpler words. Do not ask anything new. Use the same kind as that question."
-        : `Respond to the candidate's last answer. After the candidate has answered ${PRACTICE_QUESTIONS} main questions, close the interview instead of asking more.`;
+        : `Respond to the candidate's last answer. After the candidate has answered ${total} main questions, close the interview instead of asking more.`;
+  const planText = opts.plan
+    ? `\n\n${asData("PLANNED_QUESTIONS", opts.plan.map((q, i) => `${i + 1}. ${q}`).join("\n"))}\nThe candidate has already seen these main questions. Ask them in this order, keeping their meaning and wording close.`
+    : "";
   return structuredCall<{ say: string; kind: "question" | "followup" | "closing" }>({
     // The fast model: every turn is spoken aloud, so latency matters more than polish.
     role: "extract",
@@ -167,13 +202,13 @@ Rules:
 - Say one thing per turn: at most 3 short sentences and under 60 words, in plain, literal language with no idioms or sarcasm. Say the job title at most once.
 - Ask one question at a time. Base questions on the listing: the work, the skills it asks for, and common behavioral questions.
 - After an answer, acknowledge it in neutral words (no scores, no praise such as "great answer"), then either ask one follow-up about what the candidate said or move to a new question. At most one follow-up per question.
-- If an answer is short or unclear, ask a gentle, specific follow-up. Never pressure the candidate or mention time.
+- If an answer is short or unclear, ask a gentle, specific follow-up without saying that it was short, vague or unclear. Never pressure the candidate or mention time.
 ${opts.style === "written" ? "- The candidate asked for written questions, so each question must make sense on its own when read.\n" : ""}${PRACTICE_SAFETY}
 kind: "question" for a new question, "followup" for a follow-up, "closing" to end the interview.`,
     content: [
       {
         type: "text",
-        text: `Job title: ${opts.jobTitle}\nSkills in the listing: ${opts.skills.join(", ") || "not listed"}\n\n${asData("LISTING", opts.listing.slice(0, 6000))}\n\n${asData("TRANSCRIPT", transcript(opts.history) || "(not started)")}\n\nYour task: ${task}`,
+        text: `Job title: ${opts.jobTitle}\nSkills in the listing: ${opts.skills.join(", ") || "not listed"}\n\n${asData("LISTING", opts.listing.slice(0, 6000))}${planText}\n\n${asData("TRANSCRIPT", transcript(opts.history) || "(not started)")}\n\nYour task: ${task}`,
       },
     ],
     schema: {

@@ -31,6 +31,7 @@ export default function PracticePage() {
   const job = useQuery(api.jobs.get, { jobId });
   const profile = useQuery(api.profiles.get);
   const turnAction = useAction(api.ai.practice.turn);
+  const planAction = useAction(api.ai.practice.plan);
   const feedbackAction = useAction(api.ai.practice.feedback);
   const announce = useAnnounce();
   const speaker = useSpeaker();
@@ -38,8 +39,10 @@ export default function PracticePage() {
 
   const [style, setStyle] = useState<Style>("conversation");
   const [styleFromProfile, setStyleFromProfile] = useState(false);
-  const [autoSend, setAutoSend] = useState(true);
+  const [autoSend, setAutoSend] = useState(false);
   const [showTranscript, setShowTranscript] = useState(true);
+  const [advance, setAdvance] = useState(false);
+  const [plan, setPlan] = useState<string[] | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
@@ -58,7 +61,6 @@ export default function PracticePage() {
     if (profile?.requiredAccommodations.includes("written_alternatives")) {
       setStyle("written");
       setStyleFromProfile(true);
-      setAutoSend(false);
     }
   }, [profile]);
 
@@ -92,7 +94,7 @@ export default function PracticePage() {
     setPaused(false);
     announce(COPY.practice.thinking);
     try {
-      const r = await turnAction({ jobId, style, move, history: history.map(({ role, text }) => ({ role, text })) });
+      const r = await turnAction({ jobId, style, move, history: history.map(({ role, text }) => ({ role, text })), plan: plan ?? undefined });
       const line: Line = { role: "interviewer", text: r.text, audio: r.audio, kind: r.kind, source: r.source };
       const next = [...history, line];
       setLines(next);
@@ -104,6 +106,23 @@ export default function PracticePage() {
         answerRef.current?.focus();
       }
       if (r.kind === "closing") announce(COPY.practice.finished);
+    } catch (e) {
+      const a = toAppError(e);
+      setError(a.message);
+      announce(a.message, "assertive");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadPlan = async () => {
+    setBusy(true);
+    setError("");
+    announce(COPY.practice.planning);
+    try {
+      const r = await planAction({ jobId });
+      setPlan(r.questions);
+      announce(`${r.questions.length} questions ready. Take your time to read them.`);
     } catch (e) {
       const a = toAppError(e);
       setError(a.message);
@@ -150,6 +169,7 @@ export default function PracticePage() {
     setLines([]);
     setAnswer("");
     setFeedback(null);
+    setPlan(null);
     setPaused(false);
     setError("");
     announce("Practice cleared.");
@@ -192,7 +212,7 @@ export default function PracticePage() {
             {styleFromProfile && <p className="hint">{COPY.practice.styleFromProfile}</p>}
             {(["conversation", "written"] as const).map((s) => (
               <label key={s} className="ck">
-                <input type="radio" name="style" checked={style === s} onChange={() => { setStyle(s); setAutoSend(s === "conversation"); }} />
+                <input type="radio" name="style" checked={style === s} onChange={() => setStyle(s)} />
                 <span>
                   {s === "conversation" ? COPY.practice.styleConversation : COPY.practice.styleWritten}
                   <span className="muted"> ({s === "conversation" ? COPY.practice.styleConversationHint : COPY.practice.styleWrittenHint})</span>
@@ -201,17 +221,39 @@ export default function PracticePage() {
             ))}
           </fieldset>
           {transcriptToggle}
+          <div className="field">
+            <label className="ck">
+              <input type="checkbox" checked={advance} aria-describedby="advance-hint" onChange={(e) => { setAdvance(e.target.checked); if (!e.target.checked) setPlan(null); }} />
+              <span>{COPY.practice.advance}</span>
+            </label>
+            <p id="advance-hint" className="hint">{COPY.practice.advanceHint}</p>
+          </div>
           <div className="callout callout-warn"><Icon name="info" size={22} /><p className="small" style={{ margin: 0 }}>{COPY.practice.privacy}</p></div>
           <p className="hint">{COPY.practice.noTimer}</p>
-          <button className="btn btn-primary btn-lg" type="button" disabled={busy} onClick={() => void ask("start", [])} style={{ alignSelf: "flex-start", minHeight: 52 }}>
-            {busy ? COPY.practice.thinking : "Start practice"}
-          </button>
+          {plan ? (
+            <>
+              <PlanList plan={plan} />
+              <button className="btn btn-primary btn-lg" type="button" disabled={busy} onClick={() => void ask("start", [])} style={{ alignSelf: "flex-start", minHeight: 52 }}>
+                {busy ? COPY.practice.thinking : COPY.practice.ready}
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-primary btn-lg" type="button" disabled={busy} onClick={() => void (advance ? loadPlan() : ask("start", []))} style={{ alignSelf: "flex-start", minHeight: 52 }}>
+              {busy ? (advance ? COPY.practice.planning : COPY.practice.thinking) : "Start practice"}
+            </button>
+          )}
         </section>
       ) : (
         <section className="card stack" aria-labelledby="conv-h">
           <h2 id="conv-h" style={{ margin: 0, fontSize: "1.3rem" }}>Conversation</h2>
           {scripted && <div className="callout callout-warn"><Icon name="info" /><span>{COPY.practice.scripted}</span></div>}
           {transcriptToggle}
+          {plan && (
+            <details open className="panel" style={{ padding: "12px 16px" }}>
+              <summary style={{ fontWeight: 700, cursor: "pointer" }}>{COPY.practice.planTitle} ({plan.length})</summary>
+              <PlanList plan={plan} bare />
+            </details>
+          )}
           {!textVisible && <p className="panel" style={{ margin: 0, padding: "12px 16px", background: "var(--ground)" }}>{COPY.practice.transcriptHidden}</p>}
           {textVisible && <ol aria-label="Conversation" className="stack" style={{ listStyle: "none", margin: 0, padding: 0, gap: 12 }}>
             {lines.map((l, i) => (
@@ -259,10 +301,13 @@ export default function PracticePage() {
                   onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(answer); } }}
                 />
               </div>
-              <label className="ck">
-                <input type="checkbox" checked={autoSend} onChange={(e) => setAutoSend(e.target.checked)} />
-                <span>{COPY.practice.autoSend}</span>
-              </label>
+              <div className="field">
+                <label className="ck">
+                  <input type="checkbox" checked={autoSend} aria-describedby="autosend-hint" onChange={(e) => setAutoSend(e.target.checked)} />
+                  <span>{COPY.practice.autoSend}</span>
+                </label>
+                <p id="autosend-hint" className="hint">{COPY.practice.autoSendHint}</p>
+              </div>
               <div className="row">
                 <button className="btn btn-primary" type="button" disabled={busy || !answer.trim() || last?.role !== "interviewer"} onClick={() => send(answer)}>Send answer</button>
                 <button className="btn btn-secondary" type="button" disabled={busy} onClick={needMoment}>I need a moment</button>
@@ -300,6 +345,18 @@ export default function PracticePage() {
         </section>
       )}
     </main>
+  );
+}
+
+// The main questions shown in advance, for candidates who chose to see them first.
+function PlanList({ plan, bare = false }: { plan: string[]; bare?: boolean }) {
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      {!bare && <h3 style={{ margin: 0, fontSize: "1.12rem" }}>{COPY.practice.planTitle}</h3>}
+      <ol aria-label={COPY.practice.planTitle} className="stack" style={{ margin: 0, paddingLeft: 22, gap: 8 }}>
+        {plan.map((q, i) => <li key={i}>{q}</li>)}
+      </ol>
+    </div>
   );
 }
 

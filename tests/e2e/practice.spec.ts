@@ -79,3 +79,34 @@ test("practice interview: listen-only mode hides the conversation until it is tu
   await page.getByLabel("Show the conversation as text").check();
   await expect(page.getByRole("list", { name: "Conversation" }).getByRole("listitem")).toHaveCount(3);
 });
+
+test("practice interview: questions shown in advance are the ones asked; auto-send starts off", async ({ page }) => {
+  await page.addInitScript(() => {
+    const fake = { speak: () => {}, cancel: () => {}, pause: () => {}, resume: () => {} };
+    Object.defineProperty(window, "speechSynthesis", { value: fake, configurable: true });
+  });
+  await signUp(page);
+  await buildSamProfile(page);
+  await page.getByRole("button", { name: "Save and find jobs" }).click();
+  await expect(page.getByRole("list", { name: "Job matches" }).getByRole("article").first()).toBeVisible({ timeout: 15_000 });
+  await page.locator("#detail").getByRole("link", { name: "Practice an interview" }).click();
+
+  await page.getByRole("radio", { name: /Written questions/ }).check();
+  await page.getByLabel("Show me the questions before we start").check();
+  await page.getByRole("button", { name: "Start practice" }).click();
+  const planned = page.getByRole("list", { name: "Your questions" }).getByRole("listitem");
+  await expect(planned.first()).toBeVisible({ timeout: 30_000 });
+  expect(await planned.count()).toBeGreaterThanOrEqual(3);
+  const first = (await planned.first().innerText()).trim();
+
+  // Nothing starts until the candidate says they are ready.
+  await page.waitForTimeout(1000);
+  await expect(page.getByRole("list", { name: "Conversation" })).toHaveCount(0);
+  await page.getByRole("button", { name: "I'm ready to start" }).click();
+  const convo = page.getByRole("list", { name: "Conversation" }).getByRole("listitem");
+  await expect(convo).toHaveCount(1, { timeout: 30_000 });
+  await expect(convo.first()).toContainText(first.slice(0, 20));
+  // The list stays available during the practice.
+  await expect(page.getByRole("list", { name: "Your questions" })).toBeVisible();
+  await expect(page.getByLabel("Send my answer as soon as I let go")).not.toBeChecked();
+});

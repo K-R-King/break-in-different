@@ -16,7 +16,7 @@ vi.mock("./claude", () => ({
   }),
 }));
 
-const { draftEmailWithClaude, explainMatches, extractListing, extractResumeSkills, interviewerTurn, practiceFeedback } = await import("./prompts");
+const { draftEmailWithClaude, explainMatches, extractListing, extractResumeSkills, interviewerTurn, plannedQuestions, practiceFeedback } = await import("./prompts");
 const SENSITIVE = [...Object.values(CONDITION_LABELS), "neurodivergen", "disabilit", "diagnos"].map((s) => s.toLowerCase());
 
 beforeEach(() => {
@@ -45,7 +45,8 @@ describe("no disability data in any Claude prompt", () => {
       { role: "interviewer" as const, text: "Tell me about yourself." },
       { role: "candidate" as const, text: "I have ADHD and dyslexia, and I was diagnosed with autism. I build React apps." },
     ];
-    await interviewerTurn({ jobTitle: "Full Stack Developer", employerName: "Lumen Health Tech", listing: "Build things.", skills: ["React"], style: "conversation", history, move: "answer", mustClose: false });
+    await plannedQuestions({ jobTitle: "Full Stack Developer", employerName: "Lumen Health Tech", listing: "Build things.", skills: ["React"] });
+    await interviewerTurn({ jobTitle: "Full Stack Developer", employerName: "Lumen Health Tech", listing: "Build things.", skills: ["React"], style: "conversation", history, move: "answer", mustClose: false, plan: ["Tell me about yourself."] });
     await practiceFeedback({ jobTitle: "Full Stack Developer", listing: "Build things.", history });
     const sent = JSON.stringify(calls.map((c) => (c as { content: unknown }).content)).toLowerCase();
     for (const s of SENSITIVE) expect(sent).not.toContain(s);

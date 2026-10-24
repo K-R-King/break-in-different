@@ -17,6 +17,8 @@ Measured on the local stack with real keys: about 2.4–3.9 s per turn and about
 - **No timer.** The interviewer waits until an answer is sent. "I need a moment" stops the audio, and nothing moves on by itself.
 - **Candidate controls:** Repeat, Say it differently, Play on any line, Esc to stop, Start over.
 - **Two styles:** a spoken conversation, or written questions. Written questions are the default when the profile requires written alternatives.
+- **Questions in advance (option):** "Show me the questions before we start" asks Claude for the main questions first (`ai/practice:plan`). The candidate reads them, presses "I'm ready to start", and the interviewer asks them in order, with follow-ups. The list stays visible during practice.
+- **Auto-send is off by default,** so a mis-heard answer can be checked and fixed before sending.
 - **Listen-only option:** a spoken conversation can hide the text ("Show the conversation as text", on by default) to feel like a real interview. Turning it back on shows everything said so far.
 - **About 4 questions,** with at most one follow-up each. The server forces a close after 9 interviewer turns.
 - **Feedback covers content only:** whether the answer addressed the question, its structure, examples and relevance. Never tone, pace, pauses, filler words, accent or confidence.
@@ -28,7 +30,7 @@ Measured on the local stack with real keys: about 2.4–3.9 s per turn and about
 - **Answers reach Claude** with condition words (the `HEALTH_TERMS` list plus the condition labels) replaced by `[removed]`. `convex/ai/privacy.test.ts` checks this.
 - **Profile data:** disability selections and the profile are never read, and the action does not touch `sensitiveProfiles`.
 - **Interviewer audio** is put in file storage so the browser can play it, then deleted after 30 minutes by `ai/practice:forgetAudio`.
-- **Only server-written text is ever spoken.** There is no endpoint that speaks text sent from the browser.
+- **What gets spoken:** lines Claude wrote, or the scripted fallback. In the fallback, a repeated question or a question shown in advance comes back from the browser, so it must pass the same checks as Claude's lines (length, no links, no condition words) and counts toward the hourly limit.
 - **The page shows a notice** about all of the above before practice starts.
 
 ## Fallbacks
@@ -42,8 +44,8 @@ Measured on the local stack with real keys: about 2.4–3.9 s per turn and about
 
 ## Files
 
-- `convex/ai/practice.ts`: `turn`, `feedback` and `forgetAudio`
-- `convex/ai/prompts.ts`: `interviewerTurn` and `practiceFeedback`
+- `convex/ai/practice.ts`: `plan`, `turn`, `feedback` and `forgetAudio`
+- `convex/ai/prompts.ts`: `plannedQuestions`, `interviewerTurn` and `practiceFeedback`
 - `convex/ai/validators.ts`: `redactHealthTerms` and `practiceLineIsValid`
 - `convex/ai/templates.ts`: `scriptedPracticeTurn`
 - `src/routes/PracticePage.tsx`, with strings in `src/copy.ts` under `practice`
@@ -52,6 +54,7 @@ Measured on the local stack with real keys: about 2.4–3.9 s per turn and about
 ## Not built
 
 - Video. It's left out on purpose: judging faces or eye contact would penalize the users this is for, and it would send their image to a third party.
-- Saved practice history, and a link from Tracker interview dates.
+- Saved practice history.
+- **Later:** a "Practice for this interview" link next to interview dates in the Tracker.
 - A separate interviewer voice. It uses `CARTESIA_VOICE_ID` like read-aloud.
 - Streaming audio while it is still being generated.

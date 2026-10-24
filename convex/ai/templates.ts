@@ -56,7 +56,9 @@ export function fillTokens(body: string, applyUrl: string, disclosure: string, e
 
 // Scripted practice interviewer: the fallback when Claude is unavailable or a line fails validation.
 // Moves through fixed questions by counting the candidate's answers.
-export function scriptedPracticeQuestions(jobTitle: string, skills: string[]): { ask: string; rephrase: string }[] {
+export function scriptedPracticeQuestions(jobTitle: string, skills: string[], planned?: string[]): { ask: string; rephrase: string }[] {
+  // Questions the candidate has already seen are asked as written.
+  if (planned?.length) return planned.map((q) => ({ ask: q, rephrase: `Let me ask that again. ${q}` }));
   const skill = skills[0];
   return [
     {
@@ -82,14 +84,16 @@ export function scriptedPracticeTurn(opts: {
   skills: string[];
   answered: number;
   move: "start" | "answer" | "rephrase";
+  planned?: string[];
 }): { say: string; kind: "question" | "closing" } {
-  const qs = scriptedPracticeQuestions(opts.jobTitle, opts.skills);
+  const qs = scriptedPracticeQuestions(opts.jobTitle, opts.skills, opts.planned);
   if (opts.move === "start") {
-    return { say: `Hello, and thanks for practicing for the ${opts.jobTitle} role. There are ${qs.length} questions and no time limit. ${qs[0].ask}`, kind: "question" };
+    const intro = opts.planned?.length ? "You have already seen the questions, and there is no time limit." : `There are ${qs.length} questions and no time limit.`;
+    return { say: `Hello, and thanks for practicing for the ${opts.jobTitle} role. ${intro} ${qs[0].ask}`, kind: "question" };
   }
   if (opts.move === "rephrase") {
     const q = qs[Math.min(opts.answered, qs.length - 1)];
-    return { say: `Let me ask that another way. ${q.rephrase}`, kind: "question" };
+    return { say: opts.planned?.length ? q.rephrase : `Let me ask that another way. ${q.rephrase}`, kind: "question" };
   }
   if (opts.answered >= qs.length) {
     return { say: "Thank you. That is the end of this practice. You can ask for feedback on your answers now.", kind: "closing" };

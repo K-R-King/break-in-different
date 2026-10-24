@@ -123,4 +123,14 @@ describe("interview practice guardrails", () => {
     expect(scriptedPracticeTurn({ ...base, answered: 1, move: "rephrase" }).say).toMatch(/^Let me ask that another way/);
     for (const n of [0, 1, 2, 3, 4]) expect(practiceLineIsValid(scriptedPracticeTurn({ ...base, answered: n, move: "answer" }).say)).toBe(true);
   });
+  it("scripted interviewer asks questions shown in advance as written, in order", () => {
+    const planned = ["What drew you to this role?", "Tell me about a model you deployed.", "How do you handle feedback on your code?"];
+    const base = { jobTitle: "ML Engineer", skills: ["Python"], planned };
+    const start = scriptedPracticeTurn({ ...base, answered: 0, move: "start" });
+    expect(start.say).toContain("already seen the questions");
+    expect(start.say).toContain(planned[0]);
+    expect(scriptedPracticeTurn({ ...base, answered: 2, move: "answer" }).say).toContain(planned[2]);
+    expect(scriptedPracticeTurn({ ...base, answered: 3, move: "answer" }).kind).toBe("closing");
+    expect(scriptedPracticeTurn({ ...base, answered: 1, move: "rephrase" }).say).toBe(`Let me ask that again. ${planned[1]}`);
+  });
 });
