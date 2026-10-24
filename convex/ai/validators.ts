@@ -113,7 +113,8 @@ export { ACCOMMODATION_KEYWORDS };
 
 // ---------- Interview practice ----------
 
-export const PRACTICE_LINE_MAX = 400;
+// Long job titles make greetings long, so this is generous; the prompt asks for under 60 words.
+export const PRACTICE_LINE_MAX = 700;
 
 const PRACTICE_TERMS = [...new Set([...HEALTH_TERMS, ...Object.values(CONDITION_LABELS).map((l) => l.toLowerCase())])]
   .sort((a, b) => b.length - a.length)
@@ -125,10 +126,17 @@ export function redactHealthTerms(text: string): string {
   return text.replace(new RegExp(PRACTICE_TERM_SOURCE, "gi"), (_m, pre: string) => `${pre}[removed]`);
 }
 
+// Why an interviewer line or feedback sentence is rejected (for logs: a class, never the text).
+export function practiceLineProblem(text: string, max = PRACTICE_LINE_MAX): "EMPTY" | "TOO_LONG" | "LINK" | "HEALTH_TERM" | null {
+  const t = (text ?? "").trim();
+  if (!t) return "EMPTY";
+  if (t.length > max) return "TOO_LONG";
+  if (/https?:\/\/|www\./i.test(t)) return "LINK";
+  if (new RegExp(PRACTICE_TERM_SOURCE, "i").test(t)) return "HEALTH_TERM";
+  return null;
+}
+
 // An interviewer line or feedback sentence: short, no links, no health or condition words.
 export function practiceLineIsValid(text: string, max = PRACTICE_LINE_MAX): boolean {
-  const t = (text ?? "").trim();
-  if (!t || t.length > max) return false;
-  if (/https?:\/\/|www\./i.test(t)) return false;
-  return !new RegExp(PRACTICE_TERM_SOURCE, "i").test(t);
+  return practiceLineProblem(text, max) === null;
 }

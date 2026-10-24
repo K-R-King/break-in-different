@@ -108,7 +108,9 @@ describe("interview practice guardrails", () => {
     expect(practiceLineIsValid("Do you have a disability we should know about?")).toBe(false);
     expect(practiceLineIsValid("Is your ADHD under control?")).toBe(false);
     expect(practiceLineIsValid("See https://example.com for details.")).toBe(false);
-    expect(practiceLineIsValid("x".repeat(401))).toBe(false);
+    expect(practiceLineIsValid("x".repeat(701))).toBe(false);
+    // A greeting that repeats a long job title still fits.
+    expect(practiceLineIsValid(`Hello, and welcome to this practice interview for the Senior Machine Learning Engineer, Drive role at DoorDash. We have about 4 questions and there is no time limit, so take whatever time you need. To start, could you tell me about a machine learning model you built and deployed, what problem it solved, and what your part in it was?`)).toBe(true);
     expect(practiceLineIsValid("   ")).toBe(false);
   });
   it("scripted interviewer asks every question once, then closes", () => {

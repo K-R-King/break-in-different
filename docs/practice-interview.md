@@ -17,6 +17,7 @@ Measured on the local stack with real keys: about 2.4–3.9 s per turn and about
 - **No timer.** The interviewer waits until an answer is sent. "I need a moment" stops the audio, and nothing moves on by itself.
 - **Candidate controls:** Repeat, Say it differently, Play on any line, Esc to stop, Start over.
 - **Two styles:** a spoken conversation, or written questions. Written questions are the default when the profile requires written alternatives.
+- **Listen-only option:** a spoken conversation can hide the text ("Show the conversation as text", on by default) to feel like a real interview. Turning it back on shows everything said so far.
 - **About 4 questions,** with at most one follow-up each. The server forces a close after 9 interviewer turns.
 - **Feedback covers content only:** whether the answer addressed the question, its structure, examples and relevance. Never tone, pace, pauses, filler words, accent or confidence.
 - **The interviewer never asks about health, disability or other personal characteristics.** Lines containing condition words are rejected.
@@ -32,12 +33,12 @@ Measured on the local stack with real keys: about 2.4–3.9 s per turn and about
 
 ## Fallbacks
 
-| Failure                                        | What happens                                                                                                                      |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| No Claude key, `MOCK_AI=1`, or an invalid line | Scripted interviewer: 4 fixed questions built from the job title and its first listed skill, plus the notice "AI is unavailable…" |
-| No Cartesia key or Cartesia fails              | The browser's own voice, with word highlighting                                                                                   |
-| Speech-to-text unavailable or mic blocked      | A message, and the candidate types instead                                                                                        |
-| Feedback unavailable                           | A short content checklist instead of AI feedback                                                                                  |
+| Failure                                        | What happens                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No Claude key, `MOCK_AI=1`, or an invalid line | Scripted interviewer: 4 fixed questions built from the job title and its first listed skill, plus a notice on that turn ("This question is from our standard practice set…"). The reason class is logged as `practice: SCRIPTED_TURN <reason>` |
+| No Cartesia key or Cartesia fails              | The browser's own voice, with word highlighting                                                                                                                                                                                                |
+| Speech-to-text unavailable or mic blocked      | A message, and the candidate types instead                                                                                                                                                                                                     |
+| Feedback unavailable                           | A short content checklist instead of AI feedback                                                                                                                                                                                               |
 
 ## Files
 

@@ -19,6 +19,7 @@ type Line = {
   text: string;
   audio?: { url: string; words: Word[] } | null;
   kind?: "question" | "followup" | "closing";
+  source?: "claude" | "script";
 };
 type Feedback = { items: { question: string; worked: string; tryNext: string }[]; overall: string; source: "claude" | "none" };
 
@@ -38,11 +39,11 @@ export default function PracticePage() {
   const [style, setStyle] = useState<Style>("conversation");
   const [styleFromProfile, setStyleFromProfile] = useState(false);
   const [autoSend, setAutoSend] = useState(true);
+  const [showTranscript, setShowTranscript] = useState(true);
   const [lines, setLines] = useState<Line[]>([]);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [scripted, setScripted] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [feedbackBusy, setFeedbackBusy] = useState(false);
@@ -70,6 +71,20 @@ export default function PracticePage() {
   const done = last?.kind === "closing";
   const answered = lines.filter((l) => l.role === "candidate").length;
   const lastQuestionIndex = lines.map((l) => l.role).lastIndexOf("interviewer");
+  // The notice is about the latest interviewer line only; the next turn may come from Claude again.
+  const scripted = lines[lastQuestionIndex]?.source === "script";
+  // Written questions always show text; a spoken conversation can be practiced by listening only.
+  const textVisible = style === "written" || showTranscript;
+
+  const transcriptToggle = style === "conversation" && (
+    <div className="field">
+      <label className="ck">
+        <input type="checkbox" checked={showTranscript} aria-describedby="transcript-hint" onChange={(e) => setShowTranscript(e.target.checked)} />
+        <span>{COPY.practice.showTranscript}</span>
+      </label>
+      <p id="transcript-hint" className="hint">{COPY.practice.showTranscriptHint}</p>
+    </div>
+  );
 
   const ask = async (move: "start" | "answer" | "rephrase", history: Line[]) => {
     setBusy(true);
@@ -78,10 +93,9 @@ export default function PracticePage() {
     announce(COPY.practice.thinking);
     try {
       const r = await turnAction({ jobId, style, move, history: history.map(({ role, text }) => ({ role, text })) });
-      const line: Line = { role: "interviewer", text: r.text, audio: r.audio, kind: r.kind };
+      const line: Line = { role: "interviewer", text: r.text, audio: r.audio, kind: r.kind, source: r.source };
       const next = [...history, line];
       setLines(next);
-      if (r.source === "script") setScripted(true);
       if (style === "conversation") {
         announce(COPY.practice.speaking);
         void speaker.play(next.length - 1, line);
@@ -136,7 +150,6 @@ export default function PracticePage() {
     setLines([]);
     setAnswer("");
     setFeedback(null);
-    setScripted(false);
     setPaused(false);
     setError("");
     announce("Practice cleared.");
@@ -187,6 +200,7 @@ export default function PracticePage() {
               </label>
             ))}
           </fieldset>
+          {transcriptToggle}
           <div className="callout callout-warn"><Icon name="info" size={22} /><p className="small" style={{ margin: 0 }}>{COPY.practice.privacy}</p></div>
           <p className="hint">{COPY.practice.noTimer}</p>
           <button className="btn btn-primary btn-lg" type="button" disabled={busy} onClick={() => void ask("start", [])} style={{ alignSelf: "flex-start", minHeight: 52 }}>
@@ -197,7 +211,9 @@ export default function PracticePage() {
         <section className="card stack" aria-labelledby="conv-h">
           <h2 id="conv-h" style={{ margin: 0, fontSize: "1.3rem" }}>Conversation</h2>
           {scripted && <div className="callout callout-warn"><Icon name="info" /><span>{COPY.practice.scripted}</span></div>}
-          <ol aria-label="Conversation" className="stack" style={{ listStyle: "none", margin: 0, padding: 0, gap: 12 }}>
+          {transcriptToggle}
+          {!textVisible && <p className="panel" style={{ margin: 0, padding: "12px 16px", background: "var(--ground)" }}>{COPY.practice.transcriptHidden}</p>}
+          {textVisible && <ol aria-label="Conversation" className="stack" style={{ listStyle: "none", margin: 0, padding: 0, gap: 12 }}>
             {lines.map((l, i) => (
               <li key={i} className="panel stack" style={{ padding: "12px 16px", gap: 6, background: l.role === "interviewer" ? "var(--ground)" : undefined }}>
                 <p style={{ margin: 0, fontWeight: 700 }}>{l.role === "interviewer" ? "Interviewer" : "You"}</p>
@@ -216,7 +232,7 @@ export default function PracticePage() {
                 )}
               </li>
             ))}
-          </ol>
+          </ol>}
           <p role="status" className="small" style={{ margin: 0, fontWeight: 600, minHeight: "1.5em" }}>{status}</p>
 
           {!done && (

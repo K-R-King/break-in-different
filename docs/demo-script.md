@@ -17,6 +17,6 @@ Before judging: `./scripts/demo.sh reset` (fresh data), confirm `npm run doctor`
 - [ ] Agent stopped → "Scored without the agent"
 - [ ] No Cartesia key / blocked → "Using your browser's voice"
 - [ ] No Claude key → template email + "AI help is unavailable…"
-- [ ] No Claude key → practice uses the scripted interviewer + "AI is unavailable…"
+- [ ] No Claude key → practice uses the scripted interviewer + "This question is from our standard practice set…"
 - [ ] No Apify token → direct fetch (`npm run ingest`)
 - [ ] Network down → play the Loom backup

@@ -11,7 +11,7 @@ import { DEFAULT_VOICE, SAMPLE_RATE, cartesiaSse, wavFromPcm16 } from "../tts";
 import { aiEnabled } from "./claude";
 import { interviewerTurn, practiceFeedback, type PracticeFeedback, type PracticeTurn } from "./prompts";
 import { scriptedPracticeTurn } from "./templates";
-import { PRACTICE_LINE_MAX, practiceLineIsValid } from "./validators";
+import { PRACTICE_LINE_MAX, practiceLineIsValid, practiceLineProblem } from "./validators";
 
 const TURNS_PER_HOUR = 60; // turns and feedback requests together
 const MAX_TURNS = 24;
@@ -68,9 +68,13 @@ export const turn = action({
         move,
         mustClose,
       });
-      if (out && practiceLineIsValid(out.say) && (!mustClose || out.kind === "closing")) {
+      // Log only the reason class, never the line or the answers.
+      const problem = !out ? "NO_RESPONSE" : (practiceLineProblem(out.say) ?? (mustClose && out.kind !== "closing" ? "NOT_CLOSING" : null));
+      if (out && !problem) {
         line = { say: out.say.trim(), kind: out.kind };
         source = "claude";
+      } else {
+        console.warn(`practice: SCRIPTED_TURN ${problem}`);
       }
     }
     if (!line) {
