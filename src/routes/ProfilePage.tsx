@@ -606,7 +606,7 @@ function DeleteSection() {
               {error && <p className="field-error" role="alert">{error}</p>}
               <div className="row" style={{ justifyContent: "flex-end" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => ref.current?.close()} autoFocus>Cancel</button>
-                <button type="button" className="btn btn-primary" style={{ background: "var(--error)" }} onClick={() => void confirm()} disabled={busy}>
+                <button type="button" className="btn btn-primary" style={{ background: "var(--error)" }} onClick={() => void confirm()} disabled={busy} data-voice-danger>
                   {busy ? "Deleting…" : "Yes, delete everything"}
                 </button>
               </div>

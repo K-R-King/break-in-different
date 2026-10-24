@@ -6,11 +6,12 @@ import { usePrefs } from "../a11y/prefs";
 import { VoiceButton } from "../voice/live/VoiceButton";
 import { Icon } from "./Icon";
 
+// voice: other everyday names for each page, so it can be reached by voice (see src/voice/intent).
 const LINKS = [
-  { to: "/", label: "Home", end: true },
-  { to: "/profile", label: "Profile" },
-  { to: "/jobs", label: "Jobs Listing" },
-  { to: "/tracker", label: "Application Tracker" },
+  { to: "/", label: "Home", end: true, voice: "home page|start page|main page" },
+  { to: "/profile", label: "Profile", voice: "my profile|my skills|resume" },
+  { to: "/jobs", label: "Jobs Listing", voice: "jobs|job search|job listings|find jobs|search jobs" },
+  { to: "/tracker", label: "Application Tracker", voice: "applications|my applications|tracker|saved jobs" },
 ];
 
 export function Header() {
@@ -30,7 +31,7 @@ export function Header() {
             <ul className="nav">
               {LINKS.map((l) => (
                 <li key={l.to}>
-                  <NavLink to={l.to} end={l.end}>
+                  <NavLink to={l.to} end={l.end} data-voice-names={l.voice}>
                     {l.label}
                   </NavLink>
                 </li>
@@ -40,7 +41,7 @@ export function Header() {
         )}
         <div className="header-actions">
           {isAuthenticated && <VoiceButton />}
-          <button className="btn btn-secondary" type="button" onClick={openSettings}>
+          <button className="btn btn-secondary" type="button" onClick={openSettings} data-voice-id="open-settings" data-voice-names="settings|preferences|accessibility|display settings">
             <Icon name="access" />
             Accessibility settings
           </button>

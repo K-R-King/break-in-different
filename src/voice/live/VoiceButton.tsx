@@ -3,6 +3,7 @@ import { Icon } from "../../components/Icon";
 import { COPY } from "../../copy";
 import { formatCombo, isCapturing, isModifierCode, matchesCombo, useVoiceKey } from "../hotkey";
 import { useLiveVoice } from "./LiveVoice";
+import { useIntentStatus } from "../intent/VoiceIntent";
 import "./voice.css";
 
 const LINGER_MS = 5000; // the last line heard stays under the button this long after listening ends
@@ -15,6 +16,7 @@ const LINGER_MS = 5000; // the last line heard stays under the button this long 
 export function VoiceButton() {
   const v = useLiveVoice();
   const heardRef = useRef<HTMLParagraphElement>(null);
+  const intent = useIntentStatus();
   const { combo, mode } = useVoiceKey();
   const descId = useId();
   const on = v.status !== "off";
@@ -87,12 +89,51 @@ export function VoiceButton() {
   }, [v.transcript]);
 
   const showPanel = on || linger || !!v.notice;
+
+  // The panel lives in the top layer (popover) so it stays readable above an open modal dialog
+  // such as Accessibility settings, and is raised again whenever a dialog opens.
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const panel = panelRef.current;
+    const btn = btnRef.current;
+    if (!showPanel || !panel || !btn) return;
+    // Follow the button every frame: its label changes width and the header can rewrap.
+    let raf = 0;
+    const place = () => {
+      const r = btn.getBoundingClientRect();
+      const top = `${Math.max(8, r.bottom + 10)}px`;
+      const right = `${Math.max(16, window.innerWidth - r.right)}px`;
+      if (panel.style.top !== top) panel.style.top = top;
+      if (panel.style.right !== right) panel.style.right = right;
+      raf = requestAnimationFrame(place);
+    };
+    const raise = () => {
+      try {
+        if (panel.matches(":popover-open")) panel.hidePopover();
+        panel.showPopover();
+      } catch {
+        /* popover unsupported: the panel still shows in place */
+      }
+    };
+    place();
+    raise();
+    const mo = new MutationObserver((recs) => {
+      if (recs.some((r) => r.target instanceof HTMLDialogElement && r.target.open)) raise();
+    });
+    mo.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"] });
+    return () => {
+      mo.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [showPanel]);
   const notice = v.notice || (v.status === "listening" && v.muted ? COPY.voice.mutedNotice : "");
 
   return (
     <div className="voice-wrap" data-active={on}>
       <button
         type="button"
+        ref={btnRef}
         className="btn btn-secondary voice-btn"
         data-state={v.status}
         data-heard={heard}
@@ -110,10 +151,15 @@ export function VoiceButton() {
         {COPY.voice.shortcut(shortcut)} {COPY.voice.privacy}
       </span>
       {showPanel && (
-        <div className="voice-panel" data-fading={!on && !v.notice} role="region" aria-label={COPY.voice.button}>
+        <div ref={panelRef} popover="manual" className="voice-panel" data-fading={!on && !v.notice} role="region" aria-label={COPY.voice.button}>
           <p ref={heardRef} className="voice-heard" data-testid="voice-transcript" data-final={v.final} aria-hidden="true">
             {v.transcript && (on || linger) ? <>“{v.transcript}”</> : heard ? <span className="muted">{COPY.voice.sayHint}</span> : null}
           </p>
+          {intent && (
+            <p className="voice-intent" data-testid="voice-intent">
+              → {intent}
+            </p>
+          )}
           {notice && (
             <p className="small muted" style={{ margin: 0 }} data-testid="voice-message">
               {notice}

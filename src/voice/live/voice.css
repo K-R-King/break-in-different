@@ -34,11 +34,15 @@ html[data-reduce-motion="true"] .voice-btn::after { animation: none; transition:
 
 .voice-panel {
   position: absolute; top: calc(100% + 10px); right: 0; z-index: 30;
+  margin: 0; color: inherit;
   width: min(360px, calc(100vw - 32px));
   display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
   background: var(--surface); border: 2px solid var(--voice); border-radius: 14px;
   box-shadow: 0 10px 30px rgba(20, 21, 26, 0.18);
 }
+/* In the top layer (popover): fixed under the button, placed by VoiceButton. */
+.voice-panel[popover] { position: fixed; inset: auto; overflow: visible; }
+.voice-panel[popover]:not(:popover-open) { display: none; }
 .voice-panel[data-fading="true"] { animation: voice-fade 5s ease-in forwards; }
 @keyframes voice-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 html[data-reduce-motion="true"] .voice-panel[data-fading="true"] { animation: none; }
@@ -46,3 +50,25 @@ html[data-reduce-motion="true"] .voice-panel[data-fading="true"] { animation: no
 .voice-meter { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .voice-meter > span { display: block; height: 100%; background: var(--voice); transform-origin: left; transition: transform 90ms linear; }
 html[data-reduce-motion="true"] .voice-meter > span { transition: none; }
+
+/* Voice highlights (src/voice/intent/highlight.tsx): what voice control means or is doing. */
+.voice-hl-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; }
+.voice-hl {
+  position: fixed; border-radius: 12px; pointer-events: none;
+  border: 3px dashed var(--voice); background: rgba(21, 128, 61, 0.06);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 14px 3px var(--voice-glow);
+  transition: top 120ms ease-out, left 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
+}
+.voice-hl[data-state="unsure"] { border-style: dotted; }
+.voice-hl[data-state="doing"], .voice-hl[data-state="done"] { border-style: solid; background: rgba(21, 128, 61, 0.12); }
+.voice-hl[data-state="done"] { animation: voice-hl-out 1.5s ease-in forwards; }
+@keyframes voice-hl-out { 0%, 55% { opacity: 1; } 100% { opacity: 0; } }
+.voice-hl-tag {
+  position: absolute; left: -3px; bottom: calc(100% + 2px); max-width: min(420px, 90vw);
+  padding: 2px 8px; border-radius: 8px; background: var(--voice); color: #fff;
+  font-size: 0.82rem; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html[data-reduce-motion="true"] .voice-hl { transition: none; }
+html[data-reduce-motion="true"] .voice-hl[data-state="done"] { animation-duration: 0.01s; animation-delay: 1.4s; }
+@media (prefers-reduced-motion: reduce) { .voice-hl { transition: none; } }
+.voice-intent { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--voice-strong); }

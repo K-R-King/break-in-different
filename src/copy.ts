@@ -129,6 +129,10 @@ export const COPY = {
     blocked: "Microphone access is blocked. Allow it in your browser's site settings, then try again.",
     deviceLost: "The microphone was disconnected. Voice control stopped.",
     failed: (why: string) => `Voice control stopped: ${why}`,
+    alreadyHere: (page: string) => `You're already on ${page}.`,
+    noMatch: "Nothing on this page matches that yet. Try the name of a button, link or setting.",
+    unsure: (name: string) => `Did you mean "${name}"? Say it again with a little more detail.`,
+    whichOne: (a: string, b: string) => `"${a}" or "${b}"? Say which one.`,
   },
   tts: {
     browserVoice: "Using your browser's voice",

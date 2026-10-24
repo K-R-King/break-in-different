@@ -16,6 +16,7 @@ export interface ListenSnapshot {
 }
 
 export interface TurnListener {
+  onStart?(): void; // speech began: a good moment to prepare
   onUpdate?(transcript: string): void;
   onEagerEnd?(transcript: string): void;
   onResume?(): void;
@@ -85,12 +86,15 @@ export class ListenSession {
           if (s === "open") this.set({ status: "listening", notice: "" });
           else if (s === "reconnecting") this.set({ status: "reconnecting" });
         },
-        onTurnStart: () => undefined,
+        onTurnStart: () => this.turns.onStart?.(),
         onUpdate: (t) => {
           this.set({ transcript: this.pending.update(t), final: false });
           this.turns.onUpdate?.(t);
         },
-        onEagerEnd: (t) => this.turns.onEagerEnd?.(t),
+        onEagerEnd: (t) => {
+          this.set({ transcript: this.pending.update(t) });
+          this.turns.onEagerEnd?.(t);
+        },
         onResume: () => this.turns.onResume?.(),
         onEnd: (t) => {
           this.set({ transcript: this.pending.end(t), final: true });
