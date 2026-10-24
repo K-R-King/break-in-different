@@ -1,0 +1,71 @@
+/* Design tokens. Interface preferences are applied as variable swaps on <html>. */
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --ink: #14151a;
+  --muted: #4a4f5c;
+  --muted-2: #3d424d;
+  --line: #d9dce3;
+  --line-strong: #c5cad3;
+  --field-border: #7a808c;
+  --ground: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #fbfbfc;
+  --hover: #eceef2;
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-ink: #1e3a8a;
+  --focus: #1d4ed8;
+  --error: #b42318;
+  --error-ink: #7a1a12;
+  --error-bg: #fef3f2;
+
+  --stated-bg: #e7f5ec; --stated-ink: #14532d; --stated-line: #86c79c;
+  --verified-bg: #e8eefc; --verified-ink: #1e3a8a; --verified-line: #93a9ee;
+  --unverified-bg: #fef3c7; --unverified-ink: #713f12; --unverified-line: #e2b84e;
+  --none-bg: #f1f2f4; --none-ink: #3d424d; --none-line: #c5cad3;
+  --conflict-bg: #fde8e1; --conflict-ink: #7c2d12; --conflict-line: #e9967a;
+  --interview-bg: #ede9fe; --interview-ink: #4c1d95; --interview-line: #b4a3f0;
+  --highlight: #fde68a;
+
+  --font-system: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: var(--font-system);
+  --text-scale: 1;
+  --line-height: 1.5;
+  --letter-spacing: 0em;
+  --word-spacing: 0em;
+  --radius: 10px;
+  --radius-card: 18px;
+  --max: 1320px;
+}
+
+html[data-font="atkinson"] { --font-body: "Atkinson Hyperlegible", var(--font-system); }
+html[data-font="opendyslexic"] { --font-body: "OpenDyslexic", var(--font-system); }
+
+html[data-contrast="high"] {
+  --ink: #000000;
+  --muted: #1f2128;
+  --muted-2: #1f2128;
+  --line: #4a4f5c;
+  --line-strong: #2b2e36;
+  --field-border: #000000;
+  --ground: #ffffff;
+  --surface-2: #ffffff;
+  --accent: #0b2fa6;
+  --accent-hover: #061e6e;
+  --accent-ink: #061e6e;
+  --focus: #000000;
+  --stated-ink: #0a3a1c; --verified-ink: #0f2463; --unverified-ink: #4d2a07; --none-ink: #1f2128; --conflict-ink: #561d08; --interview-ink: #34106c;
+  --stated-line: #14532d; --verified-line: #1e3a8a; --unverified-line: #713f12; --none-line: #3d424d; --conflict-line: #7c2d12; --interview-line: #4c1d95;
+}

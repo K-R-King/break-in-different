@@ -1,0 +1,124 @@
+// User-facing strings in one place so wording stays consistent and reviewable.
+// Never write text that says an employer does not or cannot provide an accommodation
+// (checked by src/copy.test.ts).
+
+export const COPY = {
+  brand: "Break In Different",
+  common: {
+    network: "We could not reach the server. Check your connection and try again.",
+    unexpected: "Something went wrong. Please try again.",
+    aiUnavailable: "AI help is unavailable. You can still write this yourself.",
+    retry: "Try again",
+    saving: "Saving…",
+    saved: "Saved",
+    demoNote: "Sample listing from a fictional employer",
+  },
+  home: {
+    eyebrow: "Computer science careers, built for every way of working",
+    hero: "Find CS jobs that fit your skills, see what each listing says about accommodations, and apply your way.",
+    ctaPrimary: "Create your free account",
+    ctaSettings: "Adjust text and reading first",
+    noAccount: "No account needed to change fonts, text size or spacing. No diagnosis needed, ever.",
+    statFigure: "53%",
+    statLine: "of Gen Z say they are neurodivergent.",
+    statCaveat:
+      "Self-reported in a 2023 ZenBusiness survey of about 1,000 people aged 18–25, cited by Forbes (Sept 2026). It is not a prevalence rate, but it shows how many people need job tools that flex.",
+    placesTitle: "Your three places",
+    places: [
+      { title: "Profile", text: "Your skills, the roles you want, and the accommodations you need from an employer.", to: "/profile" },
+      { title: "Jobs Listing", text: "Ranked Full Stack and ML roles, each with quoted accommodation information.", to: "/jobs" },
+      { title: "Application Tracker", text: "Saved jobs, deadlines, email drafts, interviews and follow-up dates in one place.", to: "/tracker" },
+    ],
+    lockedHint: "Log in to open",
+    promiseTitle: "What we will never do",
+    promises: [
+      "Send anything for you. You review, approve and send every email yourself.",
+      "Ask for a diagnosis. Matching uses your skills, roles and accommodation needs only.",
+      "Guess about an employer. If a listing says nothing, we say \"Not mentioned\", nothing more.",
+      "Keep your resume. The file is deleted as soon as your skills are read.",
+    ],
+    footer: "Job data from public Greenhouse and Lever boards. Sample listings are marked DEMO.",
+  },
+  account: {
+    signUpTitle: "Create your account",
+    logInTitle: "Log in",
+    intro: "We only ask for an email and a password. You can delete all your data at any time.",
+    passwordHint: "8 or more characters.",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    signUp: "Sign up",
+    logIn: "Log in",
+    signingIn: "Signing in…",
+    enterHint: "Press Enter to submit.",
+    carryOver: "Your reading preferences from this device carry over to your account automatically.",
+    wrongCredentials: "Wrong email or password.",
+    emailTaken: "An account with this email already exists. Log in instead.",
+    invalidEmail: "Enter a valid email address.",
+    fixCount: (n: number) => (n === 1 ? "1 thing to fix" : `${n} things to fix`),
+  },
+  profile: {
+    title: "Your profile",
+    saved: "Profile saved",
+    resumeConsent: "Send this resume to an AI service to extract skills.",
+    resumeConsentDetail: "The file is deleted afterward.",
+    resumeReading: "Reading your resume…",
+    resumeLimits: "PDF up to 5 MB and 10 pages.",
+    skillsEmpty: "Add skills by hand or upload a resume.",
+    privateTitle: "Your disability or neurodivergence",
+    privateExplain:
+      "Only used to suggest accommodations and settings you can accept or ignore. It never changes your job results and never reaches an employer unless you choose to share it in an email.",
+    deleteTitle: "Your data",
+    deleteExplain:
+      "Delete your profile, private selections, matches, email drafts, tracker and account. This cannot be undone.",
+  },
+  jobs: {
+    title: "Jobs for you",
+    lede: "Ranked by your skills, roles and location. Your accommodation needs show beside every job.",
+    finding: "Finding jobs",
+    aiNote: "Scores are a guide, not a hiring prediction. AI can misread listings, so every claim shows the listing's own words.",
+    scoredWithoutAgent: "Scored without the agent",
+    usingSavedListings: "Using saved listings",
+    noneTitle: "No jobs match yet",
+    noneSuggestions: ["Add more skills to your profile", "Add a role", "Turn off some filters"],
+    notMentioned: "Not mentioned in this listing. This does not mean it is unavailable.",
+    notConfirmed: "Not confirmed. Ask the employer.",
+    limitedSkills: "Limited skill information",
+    stale: "(may be out of date)",
+  },
+  email: {
+    title: "Request accommodations",
+    disclaimer: "AI can make mistakes. This is a starting point, not legal advice. Accommodation processes vary by country and employer.",
+    recipientHint: "Add the recruiter or HR address yourself. We do not look up contacts.",
+    lockWhy: "Approve the draft to copy it or open it in your mail app. Editing after approval asks you to approve again.",
+    discloseHint: "You never have to. If you choose Yes, you pick exactly what the email says.",
+  },
+  tracker: {
+    title: "Application tracker",
+    lede: "Your saved jobs, drafts, interviews and dates in one place.",
+    empty: "Nothing saved yet.",
+    reminders: "Follow-up dates are for your own planning. We don't send reminders or emails.",
+  },
+  voice: {
+    hold: "Hold to talk",
+    listening: "Listening…",
+    working: "Working…",
+    privacy: "Your recording is sent to Cartesia to turn it into text. It is not stored.",
+    unsupported: "Voice input is not available in this browser. Use the keyboard instead.",
+    notUnderstood: (heard: string) => `Heard "${heard}". Say "help" to hear the commands.`,
+  },
+  tts: {
+    browserVoice: "Using your browser's voice",
+    reading: "Reading aloud · press Esc to stop",
+  },
+} as const;
+
+// Phrases the interface must never use about employers (A8).
+export const BANNED_PHRASES = [
+  /does not (offer|provide|support)/i,
+  /doesn't (offer|provide|support)/i,
+  /cannot (offer|provide|accommodate)/i,
+  /can't (offer|provide|accommodate)/i,
+  /\bno accommodations?\b/i,
+  /not available at this (employer|company)/i,
+  /won't accommodate/i,
+];

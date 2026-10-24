@@ -1,0 +1,22 @@
+// Loop check: sign up, save Sam's profile, run matching, list results, draft and approve an email.
+import { ConvexHttpClient } from "convex/browser";
+import { anyApi as api } from "convex/server";
+const c = new ConvexHttpClient(process.env.CONVEX_URL ?? "http://127.0.0.1:3210");
+const r = await c.action(api.auth.signIn, { provider: "password", params: { email: `sam-${Date.now()}@example.com`, password: "correct-horse-1", flow: "signUp" } });
+c.setAuth(r.tokens.token);
+const iface = { font: "atkinson", textScale: 1.5, lineHeight: 1.8, letterSpacing: 0.05, wordSpacing: 0.1, ttsHighlight: true, voiceReader: false, voiceNav: false, reduceMotion: false, contrast: "standard" };
+console.log(await c.mutation(api.profiles.save, { skills: ["TypeScript", "React", "node", "PostgreSQL", "REST APIs", "GraphQL", "Python", "Docker", "Git", "Jest"], roleIds: ["full_stack_developer"], requiredAccommodations: ["remote_work", "flexible_hours"], preferredAccommodations: ["written_alternatives"], interface: iface, locationText: "", remotePreference: "remote" }));
+let t = Date.now(); const run = await c.action(api.matches.run, {}); console.log("run", run, `${Date.now() - t} ms`);
+const list = await c.query(api.matches.list, {});
+console.log("engine", list.engine, "count", list.items.length, "usingSaved", list.usingSavedListings);
+for (const m of list.items.slice(0, 6)) console.log(m.score, m.job.title, "|", m.job.employerName, "|", JSON.stringify(m.accommodationCoverage), "|", m.explanation);
+const top = list.items[0];
+const d = await c.action(api.emails.draft, { jobId: top.jobId, accommodationCodes: ["remote_work", "flexible_hours"], disclose: false, conditions: [], disclosureFreeText: "", extraRequest: "" });
+const draft = await c.query(api.emails.get, { draftId: d.draftId });
+console.log(d.generatedBy, "\n" + draft.body);
+const d2 = await c.action(api.emails.draft, { jobId: top.jobId, accommodationCodes: ["remote_work"], disclose: true, conditions: ["dyslexia"], disclosureFreeText: "", extraRequest: "" });
+console.log("disclosed body has only dyslexia:", (await c.query(api.emails.get, { draftId: d2.draftId })).body.includes("I have Dyslexia"));
+await c.mutation(api.emails.approve, { draftId: d.draftId });
+await c.mutation(api.applications.markApplied, { jobId: top.jobId, emailDraftId: d.draftId });
+console.log("tracker:", (await c.query(api.applications.list, {})).map((a) => [a.status, a.job.title, !!a.draft?.approvedAt]));
+console.log("deleteAll:", JSON.stringify((await c.mutation(api.account.deleteAll, { confirm: true })).deleted));

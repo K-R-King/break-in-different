@@ -1,0 +1,79 @@
+# Break In Different — whole demo environment.
+# Quick start: ./scripts/demo.sh up   (see README "Run with Docker Compose")
+services:
+  backend:
+    image: ghcr.io/convex/convex-backend:latest
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - "3210:3210" # Convex API (browser connects here)
+      - "3211:3211" # Convex HTTP actions (/health, /agent/*, auth)
+    volumes:
+      - convex-data:/convex/data
+    environment:
+      - CONVEX_CLOUD_ORIGIN=http://127.0.0.1:3210
+      - CONVEX_SITE_ORIGIN=http://127.0.0.1:3211
+      - INSTANCE_NAME=break-in-different
+      - INSTANCE_SECRET=${CONVEX_INSTANCE_SECRET:?run ./scripts/demo.sh init first}
+      - DISABLE_BEACON=true
+      - DOCUMENT_RETENTION_DELAY=172800
+      - RUST_LOG=info
+    healthcheck:
+      test: curl -f http://localhost:3210/version
+      interval: 5s
+      start_period: 10s
+
+  dashboard:
+    image: ghcr.io/convex/convex-dashboard:latest
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - "6791:6791"
+    environment:
+      - NEXT_PUBLIC_DEPLOYMENT_URL=http://127.0.0.1:3210
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # One-shot: pushes convex/ functions, sets server env vars, seeds data.
+  deploy:
+    build:
+      context: .
+      dockerfile: docker/deploy.Dockerfile
+    profiles: ["tools"]
+    # Only this one-shot container reads the sponsor API keys (.env); it pushes them into Convex.
+    env_file:
+      - path: .env.docker
+      - path: .env
+        required: false
+    environment:
+      - CONVEX_SELF_HOSTED_URL=http://backend:3210
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        VITE_CONVEX_URL: http://127.0.0.1:3210
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    env_file: .env.docker
+    environment:
+      - CONVEX_SITE_URL=http://backend:3211
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  convex-data:
