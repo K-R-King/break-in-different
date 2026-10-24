@@ -10,6 +10,7 @@
 
 import type * as account from "../account.js";
 import type * as ai_claude from "../ai/claude.js";
+import type * as ai_practice from "../ai/practice.js";
 import type * as ai_prompts from "../ai/prompts.js";
 import type * as ai_templates from "../ai/templates.js";
 import type * as ai_validators from "../ai/validators.js";
@@ -46,6 +47,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   account: typeof account;
   "ai/claude": typeof ai_claude;
+  "ai/practice": typeof ai_practice;
   "ai/prompts": typeof ai_prompts;
   "ai/templates": typeof ai_templates;
   "ai/validators": typeof ai_validators;

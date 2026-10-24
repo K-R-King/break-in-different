@@ -110,6 +110,27 @@ export const COPY = {
     browserVoice: "Using your browser's voice",
     reading: "Reading aloud · press Esc to stop",
   },
+  practice: {
+    title: "Practice interview",
+    entry: "Practice an interview",
+    lede: "An AI interviewer asks about this role out loud, one question at a time. Answer by voice or by typing.",
+    noTimer: "There is no time limit. The interviewer waits until you send an answer.",
+    privacy:
+      "Your answers are sent to Claude (Anthropic) so the interviewer can respond. Common health and disability words are removed first. Nothing is saved: leaving this page clears the conversation, and the interviewer's audio is deleted within 30 minutes.",
+    aiNote: "This is practice with an AI interviewer. Real interviews vary. Feedback covers what you said, never how you said it.",
+    styleConversation: "Spoken conversation",
+    styleConversationHint: "The interviewer speaks each question aloud.",
+    styleWritten: "Written questions",
+    styleWrittenHint: "Questions appear as text. Press Play on any question to hear it.",
+    styleFromProfile: "Chosen from your profile because you asked for written alternatives. You can change it.",
+    autoSend: "Send my answer as soon as I let go",
+    moment: "Take your time. Nothing happens until you send an answer.",
+    scripted: "AI is unavailable, so you are getting our standard practice questions.",
+    thinking: "The interviewer is thinking…",
+    speaking: "The interviewer is speaking · press Esc to stop",
+    finished: "That is the end of this practice.",
+    feedbackTitle: "Feedback on your answers",
+  },
 } as const;
 
 // Phrases the interface must never use about employers (A8).

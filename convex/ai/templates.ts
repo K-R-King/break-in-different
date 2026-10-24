@@ -54,6 +54,49 @@ export function fillTokens(body: string, applyUrl: string, disclosure: string, e
   return out;
 }
 
+// Scripted practice interviewer: the fallback when Claude is unavailable or a line fails validation.
+// Moves through fixed questions by counting the candidate's answers.
+export function scriptedPracticeQuestions(jobTitle: string, skills: string[]): { ask: string; rephrase: string }[] {
+  const skill = skills[0];
+  return [
+    {
+      ask: `Tell me about yourself and what interests you in the ${jobTitle} role.`,
+      rephrase: `What would you like me to know about you, and why did you choose this ${jobTitle} role?`,
+    },
+    skill
+      ? { ask: `This role uses ${skill}. Tell me about a project where you used it.`, rephrase: `Describe one time you worked with ${skill}. What did you build?` }
+      : { ask: "Tell me about a technical project you are proud of.", rephrase: "Describe one project you built. What was your part in it?" },
+    {
+      ask: "Tell me about a time something went wrong in a project. What did you do?",
+      rephrase: "Think of one problem you had in a project. What happened, and what did you do about it?",
+    },
+    {
+      ask: "How do you like to work with a team, and how do you keep others updated on your progress?",
+      rephrase: "When you work with other people, how do you share what you are doing?",
+    },
+  ];
+}
+
+export function scriptedPracticeTurn(opts: {
+  jobTitle: string;
+  skills: string[];
+  answered: number;
+  move: "start" | "answer" | "rephrase";
+}): { say: string; kind: "question" | "closing" } {
+  const qs = scriptedPracticeQuestions(opts.jobTitle, opts.skills);
+  if (opts.move === "start") {
+    return { say: `Hello, and thanks for practicing for the ${opts.jobTitle} role. There are ${qs.length} questions and no time limit. ${qs[0].ask}`, kind: "question" };
+  }
+  if (opts.move === "rephrase") {
+    const q = qs[Math.min(opts.answered, qs.length - 1)];
+    return { say: `Let me ask that another way. ${q.rephrase}`, kind: "question" };
+  }
+  if (opts.answered >= qs.length) {
+    return { say: "Thank you. That is the end of this practice. You can ask for feedback on your answers now.", kind: "closing" };
+  }
+  return { say: `Thank you. ${qs[opts.answered].ask}`, kind: "question" };
+}
+
 function joinList(items: string[]): string {
   if (items.length <= 1) return items.join("");
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;

@@ -1,5 +1,5 @@
 // Guards on every piece of AI output (AI guardrails 2–4). Pure functions, unit tested.
-import { ACCOMMODATION_CODES, type AccommodationCode } from "../../shared/taxonomy";
+import { ACCOMMODATION_CODES, CONDITION_LABELS, type AccommodationCode } from "../../shared/taxonomy";
 import type { AccommodationInfo, MatchFactors } from "../../shared/types";
 import { normalizeWhitespace } from "../lib/text";
 import { findSkillsInText, skillKey } from "../match/skills";
@@ -110,3 +110,25 @@ export function emailIsValid(
 }
 
 export { ACCOMMODATION_KEYWORDS };
+
+// ---------- Interview practice ----------
+
+export const PRACTICE_LINE_MAX = 400;
+
+const PRACTICE_TERMS = [...new Set([...HEALTH_TERMS, ...Object.values(CONDITION_LABELS).map((l) => l.toLowerCase())])]
+  .sort((a, b) => b.length - a.length)
+  .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+const PRACTICE_TERM_SOURCE = `(^|[^a-z])(${PRACTICE_TERMS.join("|")})(?=[^a-z]|$)`;
+
+// Candidate answers are free text, so condition words are replaced before any answer reaches Claude.
+export function redactHealthTerms(text: string): string {
+  return text.replace(new RegExp(PRACTICE_TERM_SOURCE, "gi"), (_m, pre: string) => `${pre}[removed]`);
+}
+
+// An interviewer line or feedback sentence: short, no links, no health or condition words.
+export function practiceLineIsValid(text: string, max = PRACTICE_LINE_MAX): boolean {
+  const t = (text ?? "").trim();
+  if (!t || t.length > max) return false;
+  if (/https?:\/\/|www\./i.test(t)) return false;
+  return !new RegExp(PRACTICE_TERM_SOURCE, "i").test(t);
+}

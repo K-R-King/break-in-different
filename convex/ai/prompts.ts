@@ -1,10 +1,11 @@
 // Claude prompts and JSON schemas. Called only from Convex actions via structuredCall.
-// Inputs: resume text/PDF (with consent), public listing text, factor data, chosen email items.
+// Inputs: resume text/PDF (with consent), public listing text, factor data, chosen email items,
+// practice-interview answers with condition words removed.
 // Never: account identity, disability selections.
 import { ACCOMMODATION_CODES, ACCOMMODATION_LABELS, EXPERIENCE_LEVELS, type AccommodationCode } from "../../shared/taxonomy";
 import type { ExperienceLevel, JobSkill, MatchFactors } from "../../shared/types";
 import { asData, structuredCall } from "./claude";
-import { DISCLOSURE_TOKEN, LINK_TOKEN, type ExtractedAccommodation } from "./validators";
+import { DISCLOSURE_TOKEN, LINK_TOKEN, redactHealthTerms, type ExtractedAccommodation } from "./validators";
 
 export const EXTRACTION_VERSION = 1;
 
@@ -124,6 +125,97 @@ export async function explainMatches(
   });
   if (!out) return null;
   return new Map(out.explanations.map((e) => [e.id, e.text]));
+}
+
+// ---------- Interview practice (public listing text + the candidate's answers, redacted) ----------
+
+export type PracticeTurn = { role: "interviewer" | "candidate"; text: string };
+export type PracticeMove = "start" | "answer" | "rephrase";
+export type PracticeStyle = "conversation" | "written";
+export const PRACTICE_QUESTIONS = 4;
+
+const PRACTICE_SAFETY = `Never ask about or mention health, disability, diagnosis, age, family, religion, nationality or any other personal characteristic. Never comment on how the candidate speaks: pace, pauses, filler words, accent, word choice, grammar or confidence.
+Text shown as [removed] was taken out for privacy; ignore it.`;
+
+function transcript(history: PracticeTurn[]): string {
+  return history.map((t) => `${t.role === "interviewer" ? "Interviewer" : "Candidate"}: ${redactHealthTerms(t.text)}`).join("\n");
+}
+
+export async function interviewerTurn(opts: {
+  jobTitle: string;
+  employerName: string;
+  listing: string;
+  skills: string[];
+  style: PracticeStyle;
+  history: PracticeTurn[];
+  move: PracticeMove;
+  mustClose: boolean;
+}): Promise<{ say: string; kind: "question" | "followup" | "closing" } | null> {
+  const task = opts.mustClose
+    ? "Close the interview now: thank the candidate and tell them they can ask for feedback on their answers. Do not ask another question. Use kind closing."
+    : opts.move === "start"
+      ? `Greet the candidate in one sentence, say this practice has about ${PRACTICE_QUESTIONS} questions and no time limit, then ask the first question.`
+      : opts.move === "rephrase"
+        ? "Say your last question again in different, simpler words. Do not ask anything new. Use the same kind as that question."
+        : `Respond to the candidate's last answer. After the candidate has answered ${PRACTICE_QUESTIONS} main questions, close the interview instead of asking more.`;
+  return structuredCall<{ say: string; kind: "question" | "followup" | "closing" }>({
+    // The fast model: every turn is spoken aloud, so latency matters more than polish.
+    role: "extract",
+    maxTokens: 400,
+    system: `You are a friendly, patient interviewer for the ${opts.jobTitle} role at ${opts.employerName}. This is a practice interview; nothing is being assessed.
+Rules:
+- Say one thing per turn: at most 3 short sentences, in plain, literal language with no idioms or sarcasm.
+- Ask one question at a time. Base questions on the listing: the work, the skills it asks for, and common behavioral questions.
+- After an answer, acknowledge it in neutral words (no scores, no praise such as "great answer"), then either ask one follow-up about what the candidate said or move to a new question. At most one follow-up per question.
+- If an answer is short or unclear, ask a gentle, specific follow-up. Never pressure the candidate or mention time.
+${opts.style === "written" ? "- The candidate asked for written questions, so each question must make sense on its own when read.\n" : ""}${PRACTICE_SAFETY}
+kind: "question" for a new question, "followup" for a follow-up, "closing" to end the interview.`,
+    content: [
+      {
+        type: "text",
+        text: `Job title: ${opts.jobTitle}\nSkills in the listing: ${opts.skills.join(", ") || "not listed"}\n\n${asData("LISTING", opts.listing.slice(0, 6000))}\n\n${asData("TRANSCRIPT", transcript(opts.history) || "(not started)")}\n\nYour task: ${task}`,
+      },
+    ],
+    schema: {
+      type: "object",
+      properties: { say: { type: "string" }, kind: { type: "string", enum: ["question", "followup", "closing"] } },
+      required: ["say", "kind"],
+      additionalProperties: false,
+    },
+  });
+}
+
+export interface PracticeFeedback {
+  items: { question: string; worked: string; tryNext: string }[];
+  overall: string;
+}
+
+export async function practiceFeedback(opts: { jobTitle: string; listing: string; history: PracticeTurn[] }): Promise<PracticeFeedback | null> {
+  return structuredCall<PracticeFeedback>({
+    role: "write",
+    maxTokens: 1500,
+    system: `You give feedback on a practice interview for the ${opts.jobTitle} role. Comment only on the content of the answers: whether they answer the question, structure (situation, action, result), specific examples, and relevance to the listing.
+${PRACTICE_SAFETY}
+Be plain, literal, kind and specific. One item per main question the candidate answered: "question" restates it in a few words, "worked" is one sentence on what the answer did well, "tryNext" is one concrete suggestion. "overall" is one or two sentences.`,
+    content: [{ type: "text", text: `${asData("LISTING", opts.listing.slice(0, 6000))}\n\n${asData("TRANSCRIPT", transcript(opts.history))}` }],
+    schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { question: { type: "string" }, worked: { type: "string" }, tryNext: { type: "string" } },
+            required: ["question", "worked", "tryNext"],
+            additionalProperties: false,
+          },
+        },
+        overall: { type: "string" },
+      },
+      required: ["items", "overall"],
+      additionalProperties: false,
+    },
+  });
 }
 
 // ---------- Accommodation email ----------
