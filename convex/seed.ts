@@ -2,6 +2,7 @@
 // The snapshot (convex/seedData/snapshot.json) is real public listings collected once by
 // scripts/build-seed.mjs; it keeps the real source links and goes through the same extraction.
 import { createAccount } from "@convex-dev/auth/server";
+import { v } from "convex/values";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { DEMO_EMPLOYERS, DEMO_JOBS, demoApplyUrl } from "../shared/fixtures/demo-jobs";
@@ -27,6 +28,7 @@ interface SnapshotFile {
     applyUrl: string;
     sourceUrl: string;
     sourceUpdatedAt?: number;
+    accommodationForm?: { url: string; quote: string };
     contentHash: string;
     dedupeKey: string;
   }[];
@@ -139,11 +141,12 @@ export const demo = internalAction({
 });
 
 // Used by scripts/build-seed.sh to write convex/seedData/snapshot.json after a live ingest.
+// since: only listings fetched by that run, so the new snapshot replaces the old one.
 export const exportSnapshot = internalQuery({
-  args: {},
-  handler: async (ctx): Promise<SnapshotFile> => {
+  args: { since: v.optional(v.number()) },
+  handler: async (ctx, { since = 0 }): Promise<SnapshotFile> => {
     const jobs = (await ctx.db.query("jobs").withIndex("by_status", (q) => q.eq("status", "open")).collect()).filter(
-      (j) => j.source === "greenhouse" || j.source === "lever",
+      (j) => (j.source === "greenhouse" || j.source === "lever") && j.fetchedAt >= since,
     );
     const employers = new Map<string, SnapshotFile["employers"][number]>();
     const listings: SnapshotFile["listings"] = [];
@@ -163,6 +166,7 @@ export const exportSnapshot = internalQuery({
         applyUrl: j.applyUrl,
         sourceUrl: j.sourceUrl,
         sourceUpdatedAt: j.sourceUpdatedAt,
+        accommodationForm: j.accommodationForm,
         contentHash: j.contentHash,
         dedupeKey: j.dedupeKey,
       });

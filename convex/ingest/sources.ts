@@ -1,6 +1,7 @@
 // Job collection: Apify Store Actor first, direct fetch of the same public board APIs second.
 // Only documented public endpoints. Terms review per source: docs/sources.md (sign-off: Roman).
 import { htmlToText } from "../lib/text";
+import { findAccommodationForm, type AccommodationForm } from "./accommodationForm";
 
 export interface BoardRef {
   slug: string;
@@ -35,6 +36,7 @@ export interface RawListing {
   applyUrl: string;
   sourceUrl: string;
   sourceUpdatedAt?: number;
+  accommodationForm?: AccommodationForm; // found in the listing HTML before it becomes text
 }
 
 const UA = "BreakInDifferent/0.1 (Cal Hacks 13.0 project; job search for applicants with accessibility needs)";
@@ -65,6 +67,7 @@ export async function fetchGreenhouse(token: string, keep: (title: string) => bo
         title: j.title,
         location: j.location?.name ?? "",
         descriptionText: htmlToText(j.content ?? ""),
+        accommodationForm: findAccommodationForm(j.content ?? "") ?? undefined,
         applyUrl: j.absolute_url,
         sourceUrl: j.absolute_url,
         sourceUpdatedAt: j.updated_at ? Date.parse(j.updated_at) : undefined,
@@ -84,8 +87,10 @@ export async function fetchLever(site: string, keep: (title: string) => boolean,
     workplaceType?: string;
     hostedUrl: string;
     applyUrl?: string;
+    description?: string;
     descriptionPlain?: string;
     lists?: { text: string; content: string }[];
+    additional?: string;
     additionalPlain?: string;
     createdAt?: number;
   };
@@ -109,6 +114,7 @@ export async function fetchLever(site: string, keep: (title: string) => boolean,
     ]
       .filter(Boolean)
       .join("\n\n"),
+    accommodationForm: findAccommodationForm([p.description ?? "", ...(p.lists ?? []).map((l) => l.content), p.additional ?? ""].join("\n")) ?? undefined,
     applyUrl: p.applyUrl ?? p.hostedUrl,
     sourceUrl: p.hostedUrl,
     sourceUpdatedAt: p.createdAt,
@@ -156,6 +162,7 @@ export async function fetchViaApify(boards: BoardRef[], maxJobsPerCompany: numbe
       location: str(r.location),
       workplaceHint: str(r.remote_type),
       descriptionText: text,
+      accommodationForm: findAccommodationForm(str(r.description_html)) ?? undefined, // only when the Actor returns HTML
       applyUrl: str(r.apply_url ?? url),
       sourceUrl: url,
       sourceUpdatedAt: r.posted_at ? Date.parse(str(r.posted_at)) : undefined,

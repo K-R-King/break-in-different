@@ -33,6 +33,8 @@ export const vInterface = v.object({
   contrast: v.union(v.literal("standard"), v.literal("high")),
 });
 
+export const vAccommodationForm = v.object({ url: v.string(), quote: v.string() });
+
 export const vRemotePreference = v.union(v.literal("remote"), v.literal("onsite"), v.literal("either"));
 export const vWorkplaceType = v.union(
   v.literal("remote"),
@@ -139,6 +141,7 @@ export default defineSchema({
     applyUrl: v.string(),
     sourceUrl: v.string(),
     sourceUpdatedAt: v.optional(v.number()),
+    accommodationForm: v.optional(vAccommodationForm), // employer's own accommodation request form, from the listing
     fetchedAt: v.number(),
     status: v.union(v.literal("open"), v.literal("closed")),
     closedAt: v.optional(v.number()),

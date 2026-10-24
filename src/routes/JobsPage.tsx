@@ -236,7 +236,7 @@ export default function JobsPage() {
                 {running || data === undefined ? COPY.jobs.finding : `${items.length} jobs found`}
               </h2>
               <div className="row" style={{ gap: 8 }}>
-                <span className="small muted">Sorted by match score</span>
+                <span className="small muted">{COPY.jobs.sortNote}</span>
                 <button className="btn btn-secondary btn-sm" type="button" onClick={() => void doRun()} disabled={running}>Refresh matches</button>
               </div>
             </div>
@@ -303,6 +303,7 @@ function JobCard({ it, selected, onSelect, onToggleSave, onRead }: { it: Item; s
             <span>{it.job.location || "Location not stated"}</span>
             <span>{EXPERIENCE_LABELS[it.job.experienceLevel]}</span>
             {it.job.isDemo && <span className="demo">DEMO</span>}
+            {it.job.accommodationForm && <span className="lb lb-verified" data-testid="form-badge"><Icon name="check" size={14} strokeWidth={3} />{COPY.jobs.formBadge}</span>}
           </div>
         </div>
         <div aria-label={`Match score ${it.score} out of 100`} role="img" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 68, height: 68, borderRadius: 14, border: "2px solid var(--ink)", fontWeight: 800, lineHeight: 1 }}>
@@ -335,7 +336,13 @@ function JobCard({ it, selected, onSelect, onToggleSave, onRead }: { it: Item; s
       <div className="row" style={{ gap: 8 }}>
         <button className="btn btn-secondary btn-sm" type="button" aria-pressed={it.saved} onClick={onToggleSave}><Icon name="bookmark" size={18} filled={it.saved} />{it.saved ? "Saved" : "Save"}</button>
         <button className="btn btn-secondary btn-sm" type="button" onClick={onRead}><Icon name="volume" size={18} />Read aloud</button>
-        <Link className="btn btn-secondary btn-sm" to={`/jobs/${it.jobId}/email`}>Request accommodations</Link>
+        {it.job.accommodationForm ? (
+          <a className="btn btn-secondary btn-sm" href={it.job.accommodationForm.url} target="_blank" rel="noopener noreferrer">
+            {COPY.jobs.formRequest}<Icon name="external" size={16} /><span className="sr-only"> for {it.job.title} (opens in a new tab)</span>
+          </a>
+        ) : (
+          <Link className="btn btn-secondary btn-sm" to={`/jobs/${it.jobId}/email`}>Request accommodations</Link>
+        )}
         <Link className="btn btn-primary btn-sm" to={`/jobs/${it.jobId}/email`}>Apply<span className="sr-only"> to {it.job.title}</span></Link>
       </div>
     </article>
@@ -377,6 +384,8 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
         <Link className="btn btn-primary btn-lg" to={`/jobs/${jobId}/email`} style={{ minHeight: 52 }}>Request accommodations and apply</Link>
         <button className="btn btn-secondary" type="button" aria-pressed={item.saved} onClick={onToggleSave}><Icon name="bookmark" size={18} filled={item.saved} />{item.saved ? "Saved" : "Save"}</button>
       </div>
+
+      {job.accommodationForm && <EmployerFormCallout form={job.accommodationForm} employer={job.employer?.name ?? "This employer"} jobId={jobId} />}
 
       <div className="stack" style={{ gap: 10 }}>
         <h3 style={{ margin: 0, fontSize: "1.12rem" }}>About the role</h3>
@@ -454,6 +463,24 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
       </p>
       <LabelLegend />
     </section>
+  );
+}
+
+function EmployerFormCallout({ form, employer, jobId }: { form: { url: string; quote: string }; employer: string; jobId: string }) {
+  return (
+    <div className="callout callout-info" data-testid="employer-form">
+      <Icon name="info" />
+      <div className="stack" style={{ gap: 8 }}>
+        <strong>{COPY.email.formTitle(employer)}</strong>
+        <blockquote className="quote small">Listing says: "{form.quote}"</blockquote>
+        <span className="row" style={{ gap: 8 }}>
+          <a className="btn btn-primary btn-sm" href={form.url} target="_blank" rel="noopener noreferrer">
+            {COPY.email.formOpen}<Icon name="external" size={16} /><span className="sr-only"> (opens in a new tab)</span>
+          </a>
+          <Link className="btn btn-secondary btn-sm" to={`/jobs/${jobId}/email`}>Draft an email instead</Link>
+        </span>
+      </div>
+    </div>
   );
 }
 

@@ -25,6 +25,7 @@ optional CARTESIA_API_KEY "${CARTESIA_API_KEY:-}"
 optional CARTESIA_VOICE_ID "${CARTESIA_VOICE_ID:-}"
 optional APIFY_TOKEN "${APIFY_TOKEN:-}"
 optional MOCK_AI "${MOCK_AI:-}"
+optional SCHEDULED_INGEST "${SCHEDULED_INGEST:-}"
 if ! npx convex env list 2>/dev/null | grep -q "^JWKS"; then
   echo "  generating Convex Auth keys"
   KEYS=$(node scripts/generate-keys.mjs)

@@ -73,6 +73,9 @@ export const COPY = {
       "Delete your profile, private selections, matches, email drafts, tracker and account. This cannot be undone.",
   },
   jobs: {
+    formBadge: "Accommodation form",
+    sortNote: "Sorted by match score. Jobs with an accommodation form come first among close scores.",
+    formRequest: "Request accommodations (employer form)",
     title: "Jobs for you",
     lede: "Ranked by your skills, roles and location. Your accommodation needs show beside every job.",
     finding: "Finding jobs",
@@ -93,6 +96,10 @@ export const COPY = {
     lockWhy: "Approve the draft to copy it or open it in your mail app. Editing after approval asks you to approve again.",
     discloseHint: "You never have to. If you choose Yes, you pick exactly what the email says.",
     rewrite: "Write a new draft",
+    formTitle: (employer: string) => `${employer} has its own accommodation request form`,
+    formBody: "Employers usually handle requests fastest through their own form. It opens on their site in a new tab.",
+    formOpen: "Open the employer's form",
+    formPreferEmail: "Prefer email? The draft below works too.",
   },
   tracker: {
     title: "Application tracker",

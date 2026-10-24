@@ -11,7 +11,7 @@ import { accommodationsFromRules, classifyRole, experienceFromRules, skillsFromR
 import { EXTRACTION_VERSION, extractListing } from "../ai/prompts";
 import { aiEnabled } from "../ai/claude";
 import { verifyAccommodations, verifyQuote } from "../ai/validators";
-import { vRoleFamily, vWorkplaceType } from "../schema";
+import { vAccommodationForm, vRoleFamily, vWorkplaceType } from "../schema";
 
 const vListing = v.object({
   source: v.string(),
@@ -25,15 +25,27 @@ const vListing = v.object({
   applyUrl: v.string(),
   sourceUrl: v.string(),
   sourceUpdatedAt: v.optional(v.number()),
+  accommodationForm: v.optional(vAccommodationForm),
   contentHash: v.string(),
   dedupeKey: v.string(),
 });
 
 export const run = internalAction({
-  args: { sources: v.optional(v.array(v.string())), maxBoards: v.optional(v.number()), maxJobsPerBoard: v.optional(v.number()) },
+  // direct: skip Apify and read the public board APIs, which return listing HTML (needed to find accommodation forms).
+  // boards: only these board tokens (scripts/build-seed.sh scrapes a few per call to stay under the action time limit).
+  args: {
+    sources: v.optional(v.array(v.string())),
+    boards: v.optional(v.array(v.string())),
+    maxBoards: v.optional(v.number()),
+    maxJobsPerBoard: v.optional(v.number()),
+    direct: v.optional(v.boolean()),
+  },
   handler: async (ctx, args): Promise<{ via: string; status: string; fetched: number; kept: number; inserted: number; updated: number; closed: number }> => {
     const sources = args.sources ?? ["greenhouse", "lever"];
-    const boards = EMPLOYERS.filter((b) => sources.includes(b.boardType)).slice(0, Math.min(args.maxBoards ?? 50, 50));
+    const boards = EMPLOYERS.filter((b) => sources.includes(b.boardType) && (!args.boards || args.boards.includes(b.boardToken))).slice(
+      0,
+      Math.min(args.maxBoards ?? 50, 50),
+    );
     const perBoard = args.maxJobsPerBoard ?? 15;
     const runId = await ctx.runMutation(internal.ingest.run.startRun, { source: sources.join("+") });
     const employers = boards.map((b) => ({ slug: b.slug, name: b.name, boardType: b.boardType, boardToken: b.boardToken }));
@@ -60,6 +72,7 @@ export const run = internalAction({
     // 1) Apify Store Actor; 2) direct fetch of the same public endpoints, board by board.
     let via = "apify";
     try {
+      if (args.direct) throw new Error("DIRECT");
       const r = await fetchViaApify(boards, perBoard * 3);
       if (!r.listings.length) throw new Error("EMPTY");
       for (const b of boards) {
@@ -96,6 +109,24 @@ export const run = internalAction({
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Called by the daily cron. Off by default; set SCHEDULED_INGEST=1 in .env to turn it on.
+export const scheduledRun = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ skipped: true } | { skipped: false; status: string }> => {
+    if (process.env.SCHEDULED_INGEST !== "1") {
+      console.log("Scheduled ingest skipped: SCHEDULED_INGEST is not 1.");
+      return { skipped: true };
+    }
+    const r: { status: string } = await ctx.runAction(internal.ingest.run.run, {});
+    return { skipped: false, status: r.status };
+  },
+});
+
+export const listBoards = internalQuery({
+  args: {},
+  handler: async () => EMPLOYERS.map((b) => b.boardToken),
+});
 
 export const startRun = internalMutation({
   args: { source: v.string() },
@@ -150,7 +181,7 @@ export const upsertBatch = internalMutation({
         .unique();
       if (existing) {
         if (existing.contentHash === l.contentHash) {
-          await ctx.db.patch(existing._id, { fetchedAt: now, status: "open", closedAt: undefined });
+          await ctx.db.patch(existing._id, { fetchedAt: now, status: "open", closedAt: undefined, accommodationForm: l.accommodationForm });
         } else {
           await ctx.db.patch(existing._id, { ...fields, fetchedAt: now, status: "open", closedAt: undefined, extractionVersion: 0 });
           updated++;

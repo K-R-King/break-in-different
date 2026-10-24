@@ -268,6 +268,9 @@ export const purgeRequests = internalMutation({
 
 // ---------- Reads ----------
 
+const FORM_BOOST = 10;
+const MAX_ITEMS = 100;
+
 export const list = query({
   args: {
     workSetup: v.optional(v.union(v.literal("remote"), v.literal("onsite"), v.literal("any"))),
@@ -327,12 +330,16 @@ export const list = query({
           fetchedAt: job.fetchedAt,
           isDemo: job.isDemo,
           accommodations: job.accommodations,
+          accommodationForm: job.accommodationForm ?? null,
         },
         saved: appByJob.has(job._id),
         applicationStatus: appByJob.get(job._id)?.status ?? null,
       });
     }
-    items.sort((a, b) => b.score - a.score);
+    // Jobs with the employer's own accommodation form rank as if they scored up to FORM_BOOST
+    // points higher, so they lead among similar matches. The score shown is unchanged.
+    const rank = (score: number, hasForm: boolean) => score + (hasForm ? FORM_BOOST : 0);
+    items.sort((a, b) => rank(b.score, !!b.job.accommodationForm) - rank(a.score, !!a.job.accommodationForm) || b.score - a.score);
 
     const lastRequest = await ctx.db
       .query("matchRequests")
@@ -343,7 +350,8 @@ export const list = query({
     const liveFresh =
       !!lastIngest && lastIngest.status !== "failed" && Date.now() - lastIngest.startedAt < LIMITS.staleListingHours * 3600_000;
     return {
-      items: items.slice(0, 100),
+      // Top 100, plus the curated DEMO postings wherever they rank, so the demo always shows every label.
+      items: items.filter((it, i) => i < MAX_ITEMS || it.job.isDemo),
       totalMatches: rows.length,
       engine: lastRequest?.engine ?? null,
       hasRun: !!lastRequest,

@@ -18,6 +18,7 @@ import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as emails from "../emails.js";
 import type * as http from "../http.js";
+import type * as ingest_accommodationForm from "../ingest/accommodationForm.js";
 import type * as ingest_normalize from "../ingest/normalize.js";
 import type * as ingest_rules from "../ingest/rules.js";
 import type * as ingest_run from "../ingest/run.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   emails: typeof emails;
   http: typeof http;
+  "ingest/accommodationForm": typeof ingest_accommodationForm;
   "ingest/normalize": typeof ingest_normalize;
   "ingest/rules": typeof ingest_rules;
   "ingest/run": typeof ingest_run;
