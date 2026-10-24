@@ -75,7 +75,7 @@ export const synthesize = action({
   },
 });
 
-async function cartesiaSse(key: string, voiceId: string, transcript: string): Promise<{ pcm: Uint8Array; words: Word[] }> {
+export async function cartesiaSse(key: string, voiceId: string, transcript: string): Promise<{ pcm: Uint8Array; words: Word[] }> {
   const res = await fetch("https://api.cartesia.ai/tts/sse", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Cartesia-Version": CARTESIA_VERSION, "Content-Type": "application/json" },

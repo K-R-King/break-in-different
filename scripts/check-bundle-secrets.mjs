@@ -1,10 +1,10 @@
-// Fails if any secret value from .env.docker / .env.local / agent/.env appears in dist/.
+// Fails if any secret value from .env / .env.docker / .env.local / agent/.env appears in dist/.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const SECRET_KEYS = /(KEY|SECRET|TOKEN|PRIVATE|JWKS)/;
 const values = [];
-for (const f of [".env.docker", ".env.local", "agent/.env"]) {
+for (const f of [".env", ".env.docker", ".env.local", "agent/.env"]) {
   if (!existsSync(f)) continue;
   for (const line of readFileSync(f, "utf8").split("\n")) {
     const i = line.indexOf("=");

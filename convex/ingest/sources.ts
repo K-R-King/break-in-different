@@ -124,7 +124,7 @@ export async function fetchBoardDirect(b: BoardRef, keep: (title: string) => boo
 // PROVISIONAL: S4 — confirm output field names with a real run once APIFY_TOKEN is set.
 export const APIFY_ACTOR = "bovi~greenhouse-lever-ashby-job-scraper";
 
-export async function fetchViaApify(boards: BoardRef[], maxJobsPerCompany: number): Promise<{ listings: RawListing[]; okBoards: string[] }> {
+export async function fetchViaApify(boards: BoardRef[], maxJobsPerCompany: number): Promise<{ listings: RawListing[]; okBoards: string[]; rowCount: number; fieldNames: string[] }> {
   const token = process.env.APIFY_TOKEN;
   if (!token) throw new Error("NO_TOKEN");
   const res = await fetch(`https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?timeout=280`, {
@@ -161,5 +161,5 @@ export async function fetchViaApify(boards: BoardRef[], maxJobsPerCompany: numbe
       sourceUpdatedAt: r.posted_at ? Date.parse(str(r.posted_at)) : undefined,
     });
   }
-  return { listings, okBoards: [...new Set(listings.map((l) => l.boardToken))] };
+  return { listings, okBoards: [...new Set(listings.map((l) => l.boardToken))], rowCount: rows.length, fieldNames: Object.keys(rows[0] ?? {}).sort() };
 }

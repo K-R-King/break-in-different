@@ -33,6 +33,7 @@ import type * as matches from "../matches.js";
 import type * as profiles from "../profiles.js";
 import type * as resume from "../resume.js";
 import type * as seed from "../seed.js";
+import type * as spikes from "../spikes.js";
 import type * as stt from "../stt.js";
 import type * as tts from "../tts.js";
 
@@ -68,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   profiles: typeof profiles;
   resume: typeof resume;
   seed: typeof seed;
+  spikes: typeof spikes;
   stt: typeof stt;
   tts: typeof tts;
 }>;

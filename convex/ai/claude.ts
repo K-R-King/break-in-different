@@ -17,6 +17,11 @@ function modelFor(role: ModelRole): string {
 }
 
 let client: Anthropic | null = null;
+let lastError = "";
+// Last failure class for the integration check (no prompts, keys or response bodies).
+export function lastClaudeError(): string {
+  return lastError;
+}
 function getClient(): Anthropic {
   // SDK retries 408/409/429/5xx twice, honoring retry-after; 30 s per attempt.
   client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 30_000 });
@@ -31,6 +36,7 @@ export async function structuredCall<T>(opts: {
   maxTokens?: number;
 }): Promise<T | null> {
   if (!aiEnabled()) return null;
+  lastError = "";
   try {
     const response = await getClient().messages.create({
       model: modelFor(opts.role),
@@ -42,16 +48,22 @@ export async function structuredCall<T>(opts: {
         format: { type: "json_schema", schema: opts.schema },
       },
     });
-    if (response.stop_reason !== "end_turn") return null;
+    if (response.stop_reason !== "end_turn") {
+      lastError = `STOP_${response.stop_reason}`;
+      return null;
+    }
     const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
     if (!text) return null;
     return JSON.parse(text.text) as T;
   } catch (error) {
     // Log the class only: never prompts, resume text or response bodies.
-    if (error instanceof Anthropic.RateLimitError) console.warn("claude: RATE_LIMITED");
-    else if (error instanceof Anthropic.APIConnectionTimeoutError) console.warn("claude: TIMEOUT");
-    else if (error instanceof Anthropic.APIError) console.warn(`claude: API_ERROR ${error.status}`);
-    else console.warn("claude: PARSE_OR_UNKNOWN");
+    if (error instanceof Anthropic.RateLimitError) lastError = "RATE_LIMITED";
+    else if (error instanceof Anthropic.APIConnectionTimeoutError) lastError = "TIMEOUT";
+    else if (error instanceof Anthropic.AuthenticationError) lastError = "AUTHENTICATION (check ANTHROPIC_API_KEY)";
+    else if (error instanceof Anthropic.NotFoundError) lastError = "MODEL_NOT_FOUND (check CLAUDE_MODEL_*)";
+    else if (error instanceof Anthropic.APIError) lastError = `API_ERROR ${error.status}`;
+    else lastError = "PARSE_OR_UNKNOWN";
+    console.warn(`claude: ${lastError}`);
     return null;
   }
 }

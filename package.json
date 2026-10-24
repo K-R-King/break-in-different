@@ -19,7 +19,8 @@
     "seed": "npx convex run seed:demo",
     "ingest": "npx convex run ingest/run:run",
     "demo": "./scripts/demo.sh up",
-    "demo:reset": "./scripts/demo.sh reset"
+    "demo:reset": "./scripts/demo.sh reset",
+    "check:integrations": "node scripts/check-integrations.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

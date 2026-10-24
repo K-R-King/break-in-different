@@ -11,31 +11,45 @@ What it never does: send anything for you, auto-apply, ask for a diagnosis, or s
 Prerequisites: Docker Desktop, `openssl`, `curl`.
 
 ```sh
-./scripts/demo.sh init     # creates .env.docker with fresh secrets (never committed)
-# optional: add ANTHROPIC_API_KEY, CARTESIA_API_KEY, APIFY_TOKEN to .env.docker
-./scripts/demo.sh up       # starts Convex, deploys functions, seeds data, starts web + agent
+./scripts/demo.sh init     # creates .env.docker (generated secrets) and .env (from .env.example)
+# put your API keys in .env (see "Environment files" below)
+./scripts/demo.sh up       # starts Convex, deploys functions, pushes keys, seeds data, starts web + agent
+npm run check:integrations # optional: confirms Claude, Cartesia and Apify work with your keys
 ```
 
 - App: http://localhost:8080
 - Convex dashboard: http://localhost:6791 (log in with `./scripts/demo.sh admin-key`)
 - Health: http://127.0.0.1:3211/health
 
-`./scripts/demo.sh reset` wipes the database and reseeds (demo reset). `down` stops everything, `logs` follows logs. After adding API keys, run `./scripts/demo.sh up` again.
+`./scripts/demo.sh keys` re-pushes `.env` to Convex after you edit it. `reset` wipes the database and reseeds (demo reset). `down` stops everything, `logs` follows logs.
 
 Everything works without any API key: each sponsor integration has a fallback (see below).
+
+## Environment files
+
+All real env files are gitignored; only the `*.example` templates (names, no values) are tracked.
+
+| File | Holds | Created by | Read by |
+|---|---|---|---|
+| `.env` | Sponsor API keys: `ANTHROPIC_API_KEY`, `CLAUDE_MODEL_EXTRACT`, `CLAUDE_MODEL_WRITE`, `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`, `APIFY_TOKEN`, `MOCK_AI` | you (`cp .env.example .env`, or `demo.sh init`) | the one-shot `deploy` container, which pushes them into the Convex server environment |
+| `.env.docker` | Generated infrastructure secrets: `CONVEX_INSTANCE_SECRET`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `AGENT_SHARED_SECRET` | `demo.sh init` / `up` | Docker Compose, the agent |
+| `.env.local` | `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `VITE_CONVEX_URL` (public URL only) | you (`.env.local.example`) | `npx convex` CLI, Vite |
+| `agent/.env` | `CONVEX_SITE_URL`, `AGENT_SHARED_SECRET` (only when running the agent outside Docker) | you (`agent/.env.example`) | the agent |
+
+API keys live only in the Convex server environment; the browser bundle, the agent and logs never contain them (`npm run build` fails if a secret value appears in `dist/`). Leaving a key empty and running `demo.sh keys` removes it from Convex so the fallback is used.
 
 ## Local development
 
 ```sh
 npm install
 ./scripts/demo.sh up                      # or just: docker compose --env-file .env.docker up -d backend dashboard
-cp .env.example .env.local                # set CONVEX_SELF_HOSTED_ADMIN_KEY (./scripts/demo.sh admin-key)
+cp .env.local.example .env.local          # set CONVEX_SELF_HOSTED_ADMIN_KEY (./scripts/demo.sh admin-key)
 npx convex dev                            # pushes convex/ on every save
 npm run dev                               # Vite on http://localhost:5173
 npm run doctor                            # checks every required variable exists (names only)
 ```
 
-Server-side keys are set with `npx convex env set NAME value` and never appear in front-end code. The agent can also run outside Docker: `cd agent && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && set -a && . ./.env && set +a && .venv/bin/python main.py`.
+Server-side keys come from `.env` via `./scripts/demo.sh keys` (or `npx convex env set NAME value`) and never appear in front-end code. The agent can also run outside Docker: `cd agent && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt && set -a && . ./.env && set +a && .venv/bin/python main.py`.
 
 | Command | What it does |
 |---|---|
@@ -45,6 +59,7 @@ Server-side keys are set with `npx convex env set NAME value` and never appear i
 | `npm run test:a11y` | axe on all six routes in three modes (default, OpenDyslexic at 200%, high contrast) |
 | `npm run test:integration` | Ownership, unauthenticated access and the "no disability data in agent payloads" spy test (stop the agent container first; needs `AGENT_SHARED_SECRET`) |
 | `npm run build` | Typecheck, Vite build, then fail if any secret value appears in `dist/` |
+| `npm run check:integrations` | Spikes S2–S7 with the real keys: Claude extraction, conflict, PDF→skills, explanation, email drafts; Cartesia TTS timestamps and STT round trip; Apify Actor run and field names |
 | `npm run seed` / `npm run ingest` | Load DEMO + snapshot listings / run a live ingest |
 
 ## Architecture

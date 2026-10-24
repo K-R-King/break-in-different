@@ -11,13 +11,20 @@ setenv() { [ -n "${2:-}" ] && npx convex env set "$1" -- "$2" >/dev/null && echo
 echo "Setting server environment variables…"
 setenv SITE_URL "${SITE_URL:-http://localhost:8080}"
 setenv AGENT_SHARED_SECRET "${AGENT_SHARED_SECRET:-}"
-setenv ANTHROPIC_API_KEY "${ANTHROPIC_API_KEY:-}"
 setenv CLAUDE_MODEL_EXTRACT "${CLAUDE_MODEL_EXTRACT:-claude-haiku-5-5}"
 setenv CLAUDE_MODEL_WRITE "${CLAUDE_MODEL_WRITE:-claude-sonnet-5-5}"
-setenv CARTESIA_API_KEY "${CARTESIA_API_KEY:-}"
-setenv CARTESIA_VOICE_ID "${CARTESIA_VOICE_ID:-}"
-setenv APIFY_TOKEN "${APIFY_TOKEN:-}"
-setenv MOCK_AI "${MOCK_AI:-}"
+# Optional keys from .env: set when present, removed when empty so the fallback is used.
+EXISTING=$(npx convex env list 2>/dev/null | sed 's/=.*//')
+optional() {
+  if [ -n "${2:-}" ]; then setenv "$1" "$2"
+  elif printf '%s\n' "$EXISTING" | grep -qx "$1"; then npx convex env remove "$1" >/dev/null && echo "  removed $1 (fallback in use)"
+  else echo "  $1 not set (fallback in use)"; fi
+}
+optional ANTHROPIC_API_KEY "${ANTHROPIC_API_KEY:-}"
+optional CARTESIA_API_KEY "${CARTESIA_API_KEY:-}"
+optional CARTESIA_VOICE_ID "${CARTESIA_VOICE_ID:-}"
+optional APIFY_TOKEN "${APIFY_TOKEN:-}"
+optional MOCK_AI "${MOCK_AI:-}"
 if ! npx convex env list 2>/dev/null | grep -q "^JWKS"; then
   echo "  generating Convex Auth keys"
   KEYS=$(node scripts/generate-keys.mjs)

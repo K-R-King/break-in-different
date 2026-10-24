@@ -17,8 +17,12 @@ if (docker) {
   console.log("== .env.docker (Docker Compose demo)");
   for (const k of ["CONVEX_INSTANCE_SECRET", "AGENT_SHARED_SECRET"]) report(k, !!docker[k], true);
   report("CONVEX_SELF_HOSTED_ADMIN_KEY", !!docker.CONVEX_SELF_HOSTED_ADMIN_KEY, false);
-  for (const k of ["ANTHROPIC_API_KEY", "CARTESIA_API_KEY", "APIFY_TOKEN"]) report(k, !!docker[k], false);
 }
+const keys = parse(".env");
+console.log("== .env (sponsor API keys)");
+if (!keys) console.log("missing: copy .env.example to .env");
+for (const k of ["ANTHROPIC_API_KEY", "CARTESIA_API_KEY", "APIFY_TOKEN"]) report(k, !!keys?.[k], false);
+if (keys?.MOCK_AI) console.log("note   MOCK_AI is set: every integration uses its fallback");
 const local = parse(".env.local");
 if (local) {
   console.log("== .env.local (npm run dev)");

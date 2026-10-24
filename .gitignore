@@ -148,12 +148,19 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 
-# Break In Different
+# Break In Different — secrets and local state (never commit)
+.env
+.env.*
 !.env.example
+!.env.local.example
 !.env.docker.example
-.env.docker
-.env.spike
 agent/.env
+!agent/.env.example
+*.pem
+*.key
+*.p12
+secrets/
+# local tooling
 agent/.venv/
 __pycache__/
 .pytest_cache/
