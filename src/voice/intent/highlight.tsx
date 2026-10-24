@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import "../live/voice.css";
+import { reveal } from "./scroll";
 
 export type HighlightState = "guess" | "unsure" | "doing" | "done";
 
@@ -90,9 +91,6 @@ function boxOf(el: HTMLElement): Box | null {
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
-function reducedMotion() {
-  return document.documentElement.dataset.reduceMotion === "true" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-}
 
 function Ring({ h }: { h: Highlight }) {
   const last = useRef<Box | null>(null);
@@ -121,17 +119,20 @@ function Ring({ h }: { h: Highlight }) {
     return () => cancelAnimationFrame(raf);
   }, [h.el, h.key]);
 
-  // Bring an off-screen target into view once the prediction has settled (a guess that held for
-  // SETTLE_MS), or at once when acting, so the page does not jump around while words arrive.
+  // Bring the target fully into view once the prediction has settled (a guess that held for
+  // SETTLE_MS), at once when acting, and again where the action landed (a control inside the
+  // settings dialog, which only opens during the action). Never while words are still changing it.
+  const lastState = useRef(h.state);
   useEffect(() => {
-    if (h.state === "done" || scrolled.current === h.el) return;
+    const landed = h.state === "done" && lastState.current === "doing";
+    lastState.current = h.state;
+    if (scrolled.current === h.el || (h.state === "done" && !landed)) return;
     const go = () => {
       if (!h.el.isConnected) return;
       scrolled.current = h.el;
-      const r = h.el.getBoundingClientRect();
-      if (r.top < 0 || r.bottom > window.innerHeight) h.el.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+      reveal(h.el);
     };
-    if (h.state === "doing") return go();
+    if (h.state !== "guess" && h.state !== "unsure") return go();
     const t = window.setTimeout(go, SETTLE_MS);
     return () => window.clearTimeout(t);
   }, [h.el, h.state]);

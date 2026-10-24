@@ -11,6 +11,7 @@
 //           its state, and can then say "turn it on", "press it", "yes"...
 import type { Verb } from "./match";
 import type { Target } from "./scan";
+import { reveal } from "./scroll";
 
 const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
@@ -44,7 +45,7 @@ function describe(t: Target): string {
 
 function select(t: Target): Outcome {
   if (t.kind === "group") {
-    t.el.scrollIntoView({ block: "nearest" });
+    reveal(t.el);
     const first = t.el.querySelector<HTMLElement>('input:not([type="hidden"]):not([disabled]), select, textarea, button:not([disabled]), a[href]');
     first?.focus({ preventScroll: true });
   } else t.el.focus({ preventScroll: true });
