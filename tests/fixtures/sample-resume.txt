@@ -1,0 +1,12 @@
+SAMPLE RESUME (fictional persona for demos)
+
+Sam Rivera
+Final-year B.S. Computer Science, State University (expected May 2027)
+
+Projects
+- Built a course-planning web app with React, TypeScript and Node.js; data in PostgreSQL behind REST APIs.
+- Added a GraphQL layer and wrote unit tests with Jest; deployed with Docker.
+- Wrote data-cleaning scripts in Python.
+
+Skills
+TypeScript, JavaScript, React, Node.js, PostgreSQL, REST APIs, GraphQL, Python, Docker, Git, Jest, HTML, CSS

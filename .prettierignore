@@ -1,0 +1,6 @@
+dist
+convex/_generated
+node_modules
+agent/.venv
+shared/fixtures/*.json
+convex/seedData

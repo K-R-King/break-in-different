@@ -1,0 +1,332 @@
+{
+ "_comment": "Skill aliases: canonical name first. Shared by convex/match/skills.ts and agent/scorer.py.",
+ "skills": [
+  [
+   "JavaScript",
+   "js",
+   "ecmascript",
+   "es6"
+  ],
+  [
+   "TypeScript",
+   "ts"
+  ],
+  [
+   "Python",
+   "py",
+   "python3"
+  ],
+  [
+   "Java"
+  ],
+  [
+   "Go",
+   "golang"
+  ],
+  [
+   "Rust"
+  ],
+  [
+   "C++",
+   "cpp"
+  ],
+  [
+   "C#",
+   "csharp",
+   "c sharp"
+  ],
+  [
+   "C"
+  ],
+  [
+   "Ruby"
+  ],
+  [
+   "Ruby on Rails",
+   "rails",
+   "ror"
+  ],
+  [
+   "PHP"
+  ],
+  [
+   "Kotlin"
+  ],
+  [
+   "Swift"
+  ],
+  [
+   "Scala"
+  ],
+  [
+   "Elixir"
+  ],
+  [
+   "SQL"
+  ],
+  [
+   "React",
+   "react.js",
+   "reactjs"
+  ],
+  [
+   "React Native"
+  ],
+  [
+   "Next.js",
+   "nextjs",
+   "next"
+  ],
+  [
+   "Vue",
+   "vue.js",
+   "vuejs"
+  ],
+  [
+   "Angular",
+   "angularjs"
+  ],
+  [
+   "Svelte"
+  ],
+  [
+   "Redux"
+  ],
+  [
+   "HTML",
+   "html5"
+  ],
+  [
+   "CSS",
+   "css3"
+  ],
+  [
+   "Sass",
+   "scss"
+  ],
+  [
+   "Tailwind CSS",
+   "tailwind",
+   "tailwindcss"
+  ],
+  [
+   "Node.js",
+   "node",
+   "nodejs",
+   "node js"
+  ],
+  [
+   "Express",
+   "express.js",
+   "expressjs"
+  ],
+  [
+   "Django"
+  ],
+  [
+   "Flask"
+  ],
+  [
+   "FastAPI"
+  ],
+  [
+   "Spring",
+   "spring boot",
+   "springboot"
+  ],
+  [
+   ".NET",
+   "dotnet",
+   "asp.net"
+  ],
+  [
+   "GraphQL"
+  ],
+  [
+   "REST APIs",
+   "rest",
+   "restful",
+   "rest api",
+   "restful apis",
+   "rest apis"
+  ],
+  [
+   "gRPC"
+  ],
+  [
+   "PostgreSQL",
+   "postgres",
+   "psql"
+  ],
+  [
+   "MySQL"
+  ],
+  [
+   "SQLite"
+  ],
+  [
+   "MongoDB",
+   "mongo"
+  ],
+  [
+   "Redis"
+  ],
+  [
+   "DynamoDB"
+  ],
+  [
+   "Cassandra"
+  ],
+  [
+   "Elasticsearch"
+  ],
+  [
+   "Kafka",
+   "apache kafka"
+  ],
+  [
+   "RabbitMQ"
+  ],
+  [
+   "Docker"
+  ],
+  [
+   "Kubernetes",
+   "k8s"
+  ],
+  [
+   "Terraform"
+  ],
+  [
+   "AWS",
+   "amazon web services"
+  ],
+  [
+   "GCP",
+   "google cloud",
+   "google cloud platform"
+  ],
+  [
+   "Azure",
+   "microsoft azure"
+  ],
+  [
+   "Linux"
+  ],
+  [
+   "Git",
+   "github",
+   "gitlab"
+  ],
+  [
+   "CI/CD",
+   "ci",
+   "continuous integration"
+  ],
+  [
+   "Jest"
+  ],
+  [
+   "Cypress"
+  ],
+  [
+   "Playwright"
+  ],
+  [
+   "Vitest"
+  ],
+  [
+   "Webpack"
+  ],
+  [
+   "Vite"
+  ],
+  [
+   "Machine Learning",
+   "ml"
+  ],
+  [
+   "Deep Learning",
+   "dl"
+  ],
+  [
+   "PyTorch",
+   "torch"
+  ],
+  [
+   "TensorFlow",
+   "tf"
+  ],
+  [
+   "JAX"
+  ],
+  [
+   "scikit-learn",
+   "sklearn",
+   "scikit learn"
+  ],
+  [
+   "Pandas"
+  ],
+  [
+   "NumPy",
+   "numpy"
+  ],
+  [
+   "Spark",
+   "apache spark",
+   "pyspark"
+  ],
+  [
+   "Airflow",
+   "apache airflow"
+  ],
+  [
+   "NLP",
+   "natural language processing"
+  ],
+  [
+   "Computer Vision",
+   "cv"
+  ],
+  [
+   "LLMs",
+   "llm",
+   "large language models"
+  ],
+  [
+   "MLOps"
+  ],
+  [
+   "Hugging Face",
+   "huggingface",
+   "transformers"
+  ],
+  [
+   "Statistics"
+  ],
+  [
+   "Data Structures"
+  ],
+  [
+   "Algorithms"
+  ],
+  [
+   "Distributed Systems"
+  ],
+  [
+   "Microservices"
+  ],
+  [
+   "System Design"
+  ],
+  [
+   "Accessibility",
+   "a11y",
+   "wcag"
+  ],
+  [
+   "Figma"
+  ]
+ ]
+}

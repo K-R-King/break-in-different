@@ -147,3 +147,17 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Break In Different
+!.env.example
+!.env.docker.example
+.env.docker
+.env.spike
+agent/.env
+agent/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+test-results/
+playwright-report/
+scratch-*.log
