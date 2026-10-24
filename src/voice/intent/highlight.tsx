@@ -1,6 +1,7 @@
 // Green highlights for voice control. "guess": what the person seems to mean, drawn while they
 // are still talking. "doing": the action is running. "done": the current selection (what "it"
-// means next). It stays until something else is selected, so a low-vision user never loses track;
+// means next). It stays until something else is selected, so a low-vision user never loses track,
+// but only one green is ever drawn: a guess or action hides it while shown (see shown());
 // it fades only when its element is gone (after a page change, once LINGER_MS has passed) or a
 // while after listening stops.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -151,8 +152,15 @@ function Ring({ h }: { h: Highlight }) {
 }
 
 // Rendered where the target lives: an open modal dialog sits in the top layer, above the page.
+// One green at a time: the active guess or action when there is one, otherwise the selection.
+// The selection is only hidden, not dropped, so it returns if the guess goes away unused.
+export function shown(list: Highlight[]): Highlight[] {
+  const active = list.filter((h) => h.state !== "done");
+  return (active.length ? active : list).slice(-1);
+}
+
 export function HighlightLayer() {
-  const list = useHighlights();
+  const list = shown(useHighlights());
   const byHost = new Map<Element, Highlight[]>();
   for (const h of list) {
     const host = (h.el.isConnected && h.el.closest("dialog[open]")) || document.body;
