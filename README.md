@@ -32,7 +32,7 @@ All real env files are gitignored; only the `*.example` templates (names, no val
 
 | File | Holds | Created by | Read by |
 |---|---|---|---|
-| `.env` | Sponsor API keys: `ANTHROPIC_API_KEY`, `CLAUDE_MODEL_EXTRACT`, `CLAUDE_MODEL_WRITE`, `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`, `APIFY_TOKEN`, `MOCK_AI` | you (`cp .env.example .env`, or `demo.sh init`) | the one-shot `deploy` container, which pushes them into the Convex server environment |
+| `.env` | Sponsor API keys: `ANTHROPIC_API_KEY`, `CLAUDE_MODEL_EXTRACT`, `CLAUDE_MODEL_WRITE`, `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`, `APIFY_TOKEN`, `MOCK_AI`, `SCHEDULED_INGEST` (1 turns on the daily scrape; off by default for demos) | you (`cp .env.example .env`, or `demo.sh init`) | the one-shot `deploy` container, which pushes them into the Convex server environment |
 | `.env.docker` | Generated infrastructure secrets: `CONVEX_INSTANCE_SECRET`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `AGENT_SHARED_SECRET` | `demo.sh init` / `up` | Docker Compose, the agent |
 | `.env.local` | `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `VITE_CONVEX_URL` (public URL only) | you (`.env.local.example`) | `npx convex` CLI, Vite |
 | `agent/.env` | `CONVEX_SITE_URL`, `AGENT_SHARED_SECRET` (only when running the agent outside Docker) | you (`agent/.env.example`) | the agent |
@@ -62,6 +62,7 @@ Server-side keys come from `.env` via `./scripts/demo.sh keys` (or `npx convex e
 | `npm run build` | Typecheck, Vite build, then fail if any secret value appears in `dist/` |
 | `npm run check:integrations` | Spikes S2–S7 with the real keys: Claude extraction, conflict, PDF→skills, explanation, email drafts; Cartesia TTS timestamps and STT round trip; Apify Actor run and field names |
 | `npm run seed` / `npm run ingest` | Load DEMO + snapshot listings and the demo login / run a live ingest |
+| `./scripts/build-seed.sh` | Re-scrape the curated boards (direct, about 1 request/second) and replace `convex/seedData/snapshot.json` with that run's listings; then `./scripts/demo.sh reset` loads it |
 
 ## Architecture
 
@@ -96,7 +97,7 @@ Repository: `src/` React app · `convex/` backend (`ai/`, `match/`, `ingest/`, `
 ## Data sources
 
 - Curated public Greenhouse and Lever boards (25 employers, `convex/ingest/sources.ts`). Every card names its source, links to the original listing, and shows when it was checked; listings older than 72 hours are flagged.
-- `convex/seedData/snapshot.json`: 200 real public listings collected once by the ingest pipeline (2026-10-24), so the demo works offline. Real apply links are kept.
+- `convex/seedData/snapshot.json`: real public listings collected by `scripts/build-seed.sh`, so the demo works offline. Real apply links are kept. When a listing links to the employer's own accommodation request form (a form link in a paragraph about accommodations), the link and the sentence around it are kept; those jobs show an "Accommodation form" badge, rank first among close scores, and "Request accommodations" opens that form (the email draft stays available).
 - `shared/fixtures/demo-jobs.ts`: 12 fictional DEMO postings, always badged DEMO, covering every label (Stated, Verified, Unverified, Not mentioned) and one explicit on-site conflict.
 - Terms review per source: `docs/sources.md` (sign-off pending).
 

@@ -233,6 +233,23 @@ export default function EmailPage() {
         ))}
       </ol>
 
+      {job.accommodationForm && (
+        <section className="callout callout-info" aria-labelledby="form-h" data-testid="employer-form">
+          <Icon name="info" />
+          <div className="stack" style={{ gap: 8 }}>
+            <h2 id="form-h" style={{ margin: 0, fontSize: "1.15rem" }}>{COPY.email.formTitle(job.employer?.name ?? "This employer")}</h2>
+            <p style={{ margin: 0 }}>{COPY.email.formBody}</p>
+            <blockquote className="quote small">Listing says: "{job.accommodationForm.quote}"</blockquote>
+            <span className="row" style={{ gap: 12 }}>
+              <a className="btn btn-primary" href={job.accommodationForm.url} target="_blank" rel="noopener noreferrer">
+                {COPY.email.formOpen}<Icon name="external" size={18} /><span className="sr-only"> (opens in a new tab)</span>
+              </a>
+              <span className="small">{COPY.email.formPreferEmail}</span>
+            </span>
+          </div>
+        </section>
+      )}
+
       {error && <div className="callout callout-error" role="alert"><Icon name="alert" /><span>{error}</span></div>}
 
       <div className="sidebar-layout">

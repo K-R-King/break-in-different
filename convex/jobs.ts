@@ -30,6 +30,7 @@ export const get = query({
       descriptionText: job.descriptionText,
       summary: job.summary,
       applyUrl: job.applyUrl,
+      accommodationForm: job.accommodationForm ?? null,
       sourceUrl: job.sourceUrl,
       source: job.source,
       fetchedAt: job.fetchedAt,

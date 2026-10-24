@@ -3,6 +3,8 @@ import type { WorkplaceType } from "../../shared/types";
 import { sha256 } from "../lib/text";
 import { classifyRole, workplaceTypeFrom } from "./rules";
 import type { RawListing } from "./sources";
+import type { AccommodationForm } from "./accommodationForm";
+import { verifyQuote } from "../ai/validators";
 
 export interface NormalizedListing {
   source: string;
@@ -16,6 +18,7 @@ export interface NormalizedListing {
   applyUrl: string;
   sourceUrl: string;
   sourceUpdatedAt?: number;
+  accommodationForm?: AccommodationForm;
   contentHash: string;
   dedupeKey: string;
 }
@@ -47,6 +50,8 @@ export async function normalize(raw: RawListing, employerName: string): Promise<
     applyUrl: raw.applyUrl,
     sourceUrl: raw.sourceUrl,
     sourceUpdatedAt: raw.sourceUpdatedAt && !Number.isNaN(raw.sourceUpdatedAt) ? raw.sourceUpdatedAt : undefined,
+    // Kept only when its quote is found word for word in the stored listing text.
+    accommodationForm: raw.accommodationForm && verifyQuote(raw.accommodationForm.quote, descriptionText) ? raw.accommodationForm : undefined,
     contentHash: await sha256(`${title}\n${location}\n${descriptionText}`),
     dedupeKey: await sha256(`${employerName.toLowerCase()}|${title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()}|${location.toLowerCase()}`),
   };
