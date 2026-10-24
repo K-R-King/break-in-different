@@ -15,6 +15,7 @@ export interface Highlight {
 }
 
 const LINGER_MS = 1500;
+const SETTLE_MS = 350; // a guess this stable is worth scrolling to
 
 let items: Highlight[] = [];
 let nextKey = 1;
@@ -100,12 +101,19 @@ function Ring({ h }: { h: Highlight }) {
     return () => cancelAnimationFrame(raf);
   }, [h.el]);
 
-  // Bring an off-screen target into view once, so sighted users see what is meant.
+  // Bring an off-screen target into view once the prediction has settled (a guess that held for
+  // SETTLE_MS), or at once when acting, so the page does not jump around while words arrive.
   useEffect(() => {
-    if (h.state === "done" || scrolled.current === h.el || !h.el.isConnected) return;
-    scrolled.current = h.el;
-    const r = h.el.getBoundingClientRect();
-    if (r.bottom < 0 || r.top > window.innerHeight) h.el.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+    if (h.state === "done" || scrolled.current === h.el) return;
+    const go = () => {
+      if (!h.el.isConnected) return;
+      scrolled.current = h.el;
+      const r = h.el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) h.el.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+    };
+    if (h.state === "doing") return go();
+    const t = window.setTimeout(go, SETTLE_MS);
+    return () => window.clearTimeout(t);
   }, [h.el, h.state]);
 
   if (!box) return null;

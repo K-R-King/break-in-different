@@ -1,7 +1,10 @@
 // Keyword matching from what was said to something on the page. Pure and synchronous: it runs on
 // every partial transcript so the highlight can appear while the person is still talking.
 
-export type Verb = "go" | "on" | "off" | "press" | "stop";
+// Distinct actions. on: make it active (never turns anything off). off: make it inactive.
+// toggle: flip it. select: choose an option. press: click. go: navigate or move to. do: the
+// default action of what is selected ("yes", "do it"). No verb at all: select only, change nothing.
+export type Verb = "go" | "on" | "off" | "toggle" | "select" | "press" | "do" | "stop";
 export type Kind = "link" | "button" | "checkbox" | "radio" | "text" | "range" | "select" | "group";
 
 export interface Candidate {
@@ -30,17 +33,21 @@ const SYNONYMS: [RegExp, string][] = [
   [/\b(work(ing)? from home|wfh|remotely)\b/g, " remote "],
 ];
 
-// Verb phrases, longest first so "turn on" wins over "on".
+// Verb phrases. Earlier patterns claim their words first, so "turn off" never reads as "on" and
+// "switch to" never reads as "switch" (toggle).
 const VERBS: [RegExp, Verb][] = [
-  [/\b(turn|switch|toggle) (it |that |this )?off\b|\b(disable|deactivate|uncheck|untick|deselect|unselect)\b/g, "off"],
-  [/\b(turn|switch|toggle) (it |that |this )?on\b|\b(enable|activate|check|tick|select|choose|pick)\b/g, "on"],
+  [/\b(turn|switch|toggle) (it |that |this )?off\b|\b(disable|deactivate|uncheck|untick|(don't|do not|no longer) need)\b/g, "off"],
+  [/\b(turn|switch|toggle) (it |that |this )?on\b|\b(enable|activate|check|tick|(i )?need)\b/g, "on"],
+  [/\b(do (it|that)|yes|yeah|yep|go ahead|confirm|okay|ok|sure)\b/g, "do"],
   [/\b(go( back)? to|take me to|navigate to|switch to|bring me to|go|open|show( me)?|jump to|move to|find)\b/g, "go"],
+  [/\b(toggle|flip|switch)\b/g, "toggle"],
+  [/\b(select|choose|pick|use)\b/g, "select"],
   [/\b(click|press|tap|hit|push)( on)?\b/g, "press"],
   [/\b(stop|cancel|never ?mind|nevermind|close)\b/g, "stop"],
 ];
 
 const STOP = new Set(
-  "a an the to my me of and or with when while doing for please i i'd id want would like can you could it this that these those is be on off in at up some any page button checkbox box option radio toggle switch link tab field one just only now also then so let's lets us".split(" "),
+  "a an the to my me of and or with when while doing for please i i'd id want would like can you could it this that these those is be on off in at up some any page button checkbox box option radio toggle switch link tab field one just only now also then so let's lets us no".split(" "),
 );
 
 export function stem(w: string): string {
@@ -118,7 +125,32 @@ export function alreadyHere(text: string, candidates: Candidate[]): Candidate | 
   return null;
 }
 
-export function bestMatch(text: string, candidates: Candidate[], recent?: number): Match | null {
+export interface MatchOptions {
+  recent?: number; // what was last acted on or selected
+  sticky?: number; // the guess shown now: keep it unless something clearly fits better
+  context?: Set<number>; // groups around where the person is working (focus, last action)
+}
+
+const STICKY_BONUS = 0.75;
+// Same words, different kinds of control: the verb says which ("press add skill" is the button,
+// "add skill" alone selects the box to type in).
+const AFFINITY: Record<Verb | "none", Kind[]> = {
+  none: ["text", "select", "range", "group"],
+  select: ["radio", "checkbox", "select"],
+  on: ["checkbox", "radio", "button"],
+  off: ["checkbox", "button"],
+  toggle: ["checkbox", "button"],
+  press: ["button", "link"],
+  do: ["button", "link"],
+  go: ["link", "group"],
+  stop: [],
+};
+const AFFINITY_BONUS = 0.6;
+// Repeated controls (a "Save" on every job card): the one where the person is working wins.
+const CONTEXT_BONUS = 0.6;
+
+export function bestMatch(text: string, candidates: Candidate[], opts: MatchOptions = {}): Match | null {
+  const { recent, sticky, context } = opts;
   const { verb, words } = parse(text);
   if (!words.length) return null;
   const said = new Set(words);
@@ -154,9 +186,11 @@ export function bestMatch(text: string, candidates: Candidate[], recent?: number
       }
     }
     if (c.hidden) score -= 0.3;
-    if (c.current) score -= 1; // already there: "job filters" on the Jobs page means the filters
     if (c.inView) score += 0.1;
     if (recent !== undefined && (c.id === recent || c.parent === recent)) score += 0.2;
+    if (c.id === sticky) score += STICKY_BONUS;
+    if (AFFINITY[verb ?? "none"].includes(c.kind)) score += AFFINITY_BONUS;
+    if (context && c.parent !== undefined && context.has(c.parent)) score += CONTEXT_BONUS;
     scored.push({ c, own: h.hits, score });
   }
   if (!scored.length) return null;

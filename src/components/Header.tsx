@@ -8,7 +8,7 @@ import { Icon } from "./Icon";
 
 // voice: other everyday names for each page, so it can be reached by voice (see src/voice/intent).
 const LINKS = [
-  { to: "/", label: "Home", end: true, voice: "home page|start page|main page" },
+  { to: "/", label: "Home", end: true, voice: "home page|start page" },
   { to: "/profile", label: "Profile", voice: "my profile|my skills|resume" },
   { to: "/jobs", label: "Jobs Listing", voice: "jobs|job search|job listings|find jobs|search jobs" },
   { to: "/tracker", label: "Application Tracker", voice: "applications|my applications|tracker|saved jobs" },

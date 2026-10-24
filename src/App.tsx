@@ -42,7 +42,7 @@ export function App() {
         <ReaderProvider>
           <VoiceProvider>
           <LiveVoiceProvider>
-            <a className="skip" href="#main">
+            <a className="skip" href="#main" data-voice-ignore>
               Skip to main content
             </a>
             <Header />
