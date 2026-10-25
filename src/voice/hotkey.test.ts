@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { comboConflict, comboProblem, formatCombo, matchesCombo, DEFAULT_VOICE_KEY, type Combo } from "./hotkey";
+import { comboConflict, comboProblem, defaultCombo, formatCombo, matchesCombo, DEFAULT_VOICE_KEY, type Combo } from "./hotkey";
 
 const combo = (code: string, mods: Partial<Omit<Combo, "code">> = {}): Combo => ({ code, ctrl: false, alt: false, shift: false, meta: false, ...mods });
 
 describe("voice shortcut", () => {
   it("formats combos for each platform", () => {
-    expect(formatCombo(DEFAULT_VOICE_KEY.combo, false)).toBe("Ctrl+Space");
+    expect(formatCombo(defaultCombo(false), false)).toBe("Ctrl+/");
+    expect(formatCombo(defaultCombo(true), true)).toBe("Cmd+/");
     expect(formatCombo(combo("KeyK", { alt: true, shift: true }), true)).toBe("Option+Shift+K");
     expect(formatCombo(combo("F2"), false)).toBe("F2");
   });
@@ -24,13 +25,16 @@ describe("voice shortcut", () => {
     expect(comboConflict(combo("KeyC", { meta: true }), true)).not.toBeNull();
     expect(comboConflict(combo("Space", { meta: true }), true)).not.toBeNull();
     expect(comboConflict(combo("F5"), false)).not.toBeNull();
-    expect(comboConflict(DEFAULT_VOICE_KEY.combo, false)).toBeNull();
+    expect(comboConflict(defaultCombo(false), false)).toBeNull();
+    expect(comboConflict(defaultCombo(true), true)).toBeNull();
+    expect(comboProblem(defaultCombo(true))).toBeNull();
     expect(comboConflict(combo("KeyK", { alt: true, shift: true }), false)).toBeNull();
   });
 
   it("matches only the exact modifiers", () => {
-    const e = { code: "Space", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false };
-    expect(matchesCombo(e, DEFAULT_VOICE_KEY.combo)).toBe(true);
-    expect(matchesCombo({ ...e, shiftKey: true }, DEFAULT_VOICE_KEY.combo)).toBe(false);
+    const e = { code: "Slash", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false };
+    expect(matchesCombo(e, defaultCombo(false))).toBe(true);
+    expect(matchesCombo({ ...e, shiftKey: true }, defaultCombo(false))).toBe(false);
+    expect(matchesCombo({ ...e, ctrlKey: false, metaKey: true }, defaultCombo(true))).toBe(true);
   });
 });

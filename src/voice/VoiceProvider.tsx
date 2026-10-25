@@ -172,11 +172,11 @@ export function useVoiceHandlers(h: PageHandlers) {
 
 // aria-keyshortcuts uses key names: "Control+Space", "Alt+Shift+K".
 function ariaShortcut(c: Combo): string {
-  const key = c.code.startsWith("Key") ? c.code.slice(3) : c.code.startsWith("Digit") ? c.code.slice(5) : c.code;
+  const key = c.code.startsWith("Key") ? c.code.slice(3) : c.code.startsWith("Digit") ? c.code.slice(5) : c.code === "Slash" ? "/" : c.code;
   return [c.ctrl && "Control", c.alt && "Alt", c.shift && "Shift", c.meta && "Meta", key].filter(Boolean).join("+");
 }
 
-// Talk by holding the button or the shortcut (default Ctrl+Space), or in toggle mode press once to
+// Talk by holding the button or the shortcut (default Cmd+/ on a Mac, Ctrl+/ elsewhere), or in toggle mode press once to
 // start and again to stop. The shortcut works anywhere on the page because it needs a modifier.
 export function PushToTalkButton() {
   const { state, message, start, finish } = useVoice();
