@@ -52,10 +52,22 @@ html[data-reduce-motion="true"] .voice-btn::after { animation: none; transition:
 .voice-panel[data-fading="true"] { animation: voice-fade 12s ease-in forwards; }
 @keyframes voice-fade { 0%, 88% { opacity: 1; } 100% { opacity: 0; } }
 html[data-reduce-motion="true"] .voice-panel[data-fading="true"] { animation: none; }
-.voice-heard { margin: 0; font-weight: 600; min-height: 1.5em; max-height: 9.5em; overflow-y: auto; color: var(--voice-strong); overflow-wrap: anywhere; }
-.voice-meter { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
-.voice-meter > span { display: block; height: 100%; background: var(--voice); transform-origin: left; transition: transform 90ms linear; }
-html[data-reduce-motion="true"] .voice-meter > span { transition: none; }
+/* Two rows. 1: what is being said (gray), or a fainter italic prompt to start. 2: the assistant's
+   reply (ink), or a shimmering green "Listening…" / "Thinking…". */
+:root { --voice-said: var(--muted); --voice-hint-ink: #6b7180; /* 4.9:1 on white */ }
+html[data-contrast="high"] { --voice-hint-ink: #3d424d; }
+.voice-said { margin: 0; min-height: 1.5em; max-height: 4.6em; overflow-y: auto; color: var(--voice-said); overflow-wrap: anywhere; }
+.voice-hint { color: var(--voice-hint-ink); font-style: italic; }
+.voice-reply { margin: 0; min-height: 1.5em; max-height: 9.5em; overflow-y: auto; color: var(--ink); font-weight: 500; overflow-wrap: anywhere; }
+.voice-shimmer {
+  font-weight: 600; font-style: italic; color: var(--voice-strong);
+  background: linear-gradient(90deg, var(--voice-strong) 0%, var(--voice-strong) 35%, #6ee7a1 50%, var(--voice-strong) 65%, var(--voice-strong) 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: voice-shimmer 1.6s linear infinite;
+}
+@keyframes voice-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+html[data-reduce-motion="true"] .voice-shimmer, html[data-contrast="high"] .voice-shimmer { animation: none; background: none; -webkit-text-fill-color: currentColor; }
+@media (prefers-reduced-motion: reduce) { .voice-shimmer { animation: none; background: none; -webkit-text-fill-color: currentColor; } }
 
 /* Voice highlights (src/voice/intent/highlight.tsx): what voice control means or is doing. */
 .voice-hl-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; }
@@ -80,4 +92,4 @@ html[data-reduce-motion="true"] .voice-meter > span { transition: none; }
 html[data-reduce-motion="true"] .voice-hl { transition: none; }
 html[data-reduce-motion="true"] .voice-hl[data-fading] { animation-duration: 0.01s; animation-delay: 1.1s; }
 @media (prefers-reduced-motion: reduce) { .voice-hl { transition: none; } }
-.voice-intent { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--voice-strong); }
+

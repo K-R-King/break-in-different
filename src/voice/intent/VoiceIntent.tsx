@@ -21,19 +21,27 @@ import { parseScroll, scrollPage } from "./scroll";
 import { resolveVerbOnly } from "./resolve";
 import { useVoiceActions } from "./actions";
 
-// The line under the transcript: what voice control is about to do, did, or needs.
-let status = "";
-const statusSubs = new Set<() => void>();
-function setStatus(s: string) {
-  if (s === status) return;
-  status = s;
-  statusSubs.forEach((f) => f());
+// The voice panel's second row: what the assistant says (its replies only), or that it is
+// listening or thinking. Cleared when the person speaks again.
+export type PanelPhase = "idle" | "listening" | "thinking";
+interface PanelState {
+  reply: string;
+  phase: PanelPhase;
 }
-export function useIntentStatus(): string {
+let panel: PanelState = { reply: "", phase: "idle" };
+const panelSubs = new Set<() => void>();
+function setPanel(patch: Partial<PanelState>) {
+  const next = { ...panel, ...patch };
+  if (next.reply === panel.reply && next.phase === panel.phase) return;
+  panel = next;
+  panelSubs.forEach((f) => f());
+}
+const addReply = (text: string) => setPanel({ reply: panel.reply ? `${panel.reply} ${text}` : text, phase: "idle" });
+export function useVoicePanel(): PanelState {
   return useSyncExternalStore(
-    (f) => (statusSubs.add(f), () => statusSubs.delete(f)),
-    () => status,
-    () => status,
+    (f) => (panelSubs.add(f), () => panelSubs.delete(f)),
+    () => panel,
+    () => panel,
   );
 }
 
@@ -87,7 +95,7 @@ export function VoiceIntent() {
     };
     // Show, announce and (if enabled) speak a reply.
     const reply = (text: string) => {
-      setStatus(text);
+      addReply(text);
       announce(text);
       if (getVoiceSettings().speak) speaker.say(text);
     };
@@ -112,7 +120,6 @@ export function VoiceIntent() {
       guessed.current = null;
       const label = intentLabel(t, verb);
       highlights.doing(highlightBox(t), label);
-      setStatus(label);
       chain = chain.then(async () => {
         // One frame between actions, so a typed value is in place before its button is pressed.
         await new Promise<void>((r) => requestAnimationFrame(() => r()));
@@ -127,7 +134,6 @@ export function VoiceIntent() {
           highlights.done(highlightBox({ ...t, opener: undefined, el: out.el }), out.message);
           remember("assistant", `[did: ${verb ?? "select"} ${t.label}]`);
           if (narrate) reply(words);
-          else setStatus(out.message);
         } finally {
           busy.current = false;
         }
@@ -148,7 +154,7 @@ export function VoiceIntent() {
       const runState = { text, abort, started: false };
       agentRun.current = runState;
       remember("user", text);
-      setStatus(COPY.voice.thinking);
+      setPanel({ phase: "thinking" });
       const timer = window.setTimeout(() => {
         if (!runState.started) abort.abort();
       }, AGENT_TIMEOUT_MS);
@@ -167,6 +173,7 @@ export function VoiceIntent() {
         if (agentRun.current !== runState) return;
         if (!runState.started) {
           runState.started = true;
+          setPanel({ phase: "idle" });
           window.clearTimeout(timer);
           session.consume();
           speaker.stop();
@@ -238,8 +245,7 @@ export function VoiceIntent() {
         highlights.clearGuess();
         const here = alreadyHere(text, targets);
         if (here || definite) session.consume();
-        setStatus(here ? COPY.voice.alreadyHere(targets[here.id].label) : COPY.voice.noMatch);
-        if (definite) announce(here ? COPY.voice.alreadyHere(targets[here.id].label) : COPY.voice.noMatch);
+        if (definite) reply(here ? COPY.voice.alreadyHere(targets[here.id].label) : COPY.voice.noMatch);
         return;
       }
       const t = targets[m.id];
@@ -251,8 +257,7 @@ export function VoiceIntent() {
         if (group) highlights.guess(highlightBox(group), group.label, "unsure");
         const places = same.map((id) => targets[targets[id].parent ?? -1]?.label).filter(Boolean) as string[];
         const ask = COPY.voice.whichPlace(t.label, places);
-        setStatus(ask);
-        if (definite) announce(ask);
+        if (definite) reply(ask);
         return;
       }
       guessed.current = t.el;
@@ -262,8 +267,7 @@ export function VoiceIntent() {
         session.consume();
       }
       const ask = rival ? COPY.voice.whichOne(t.label, rival.label) : COPY.voice.unsure(t.label);
-      setStatus(ask);
-      if (definite) announce(ask);
+      if (definite) reply(ask);
     };
 
     // definite: the turn really ended (turn.end), not just predicted to (turn.eager_end).
@@ -277,6 +281,8 @@ export function VoiceIntent() {
       }
       // The assistant is already answering exactly this: nothing more to do.
       if (agentRun.current && agentRun.current.text === text && final) return;
+      // The end of what they said: no longer listening (an assistant call shows it is thinking).
+      if (final && panel.phase === "listening") setPanel({ phase: "idle" });
       if (final && STOP_LISTENING.test(text)) {
         session.consume();
         session.stop();
@@ -287,11 +293,10 @@ export function VoiceIntent() {
       const scroll = parseScroll(text) ?? parseScroll(lastTurn.current) ?? parseScroll(clause);
       if (scroll) {
         highlights.clearGuess();
-        if (!final) return setStatus(scroll.dir < 0 ? COPY.voice.scrollingUp : COPY.voice.scrollingDown);
+        if (!final) return;
         session.consume();
         const msg = scrollPage(scroll, recent.current?.isConnected ? recent.current : document.activeElement);
-        setStatus(msg);
-        announce(msg);
+        reply(msg);
         return;
       }
       performance.mark("voice:match-start");
@@ -338,7 +343,6 @@ export function VoiceIntent() {
             const id = "act" in r ? r.act : r.ask;
             const label = "act" in r ? intentLabel(targets[id], said.verb) : targets[id].label;
             highlights.guess(highlightBox(targets[id]), label, "act" in r ? "guess" : "unsure");
-            setStatus(label);
           }
           return;
         }
@@ -351,15 +355,13 @@ export function VoiceIntent() {
         session.consume();
         if (!r) {
           const msg = anchor === undefined ? COPY.voice.nothingSelected : COPY.voice.verbDoesNotFit(targets[anchor].label);
-          setStatus(msg);
-          announce(msg);
+          reply(msg);
           return;
         }
         recent.current = targets[r.ask].el;
         highlights.guess(highlightBox(targets[r.ask]), targets[r.ask].label, "unsure");
         const ask = COPY.voice.whichOf(r.options.map((i) => targets[i].label));
-        setStatus(ask);
-        announce(ask);
+        reply(ask);
         return;
       }
       let m = pick(text, targets);
@@ -381,7 +383,6 @@ export function VoiceIntent() {
           if (id === null) highlights.clearGuess();
           else {
             highlights.guess(highlightBox(targets[id]), COPY.voice.maybe(targets[id].label), "hint");
-            setStatus(COPY.voice.maybe(targets[id].label));
           }
           return;
         }
@@ -391,7 +392,6 @@ export function VoiceIntent() {
         const shown = rival && rival.label === t.label ? commonGroup(targets, [t.id, rival.id]) ?? t : t;
         guessed.current = shown === t ? t.el : null;
         highlights.guess(highlightBox(shown), shown === t ? intentLabel(t, m.verb) : shown.label, "guess");
-        setStatus(shown === t ? intentLabel(t, m.verb) : shown.label);
         return;
       }
 
@@ -413,6 +413,7 @@ export function VoiceIntent() {
         void scanCached();
         speaker.stop(); // the person is talking: stop speaking
         highlights.dismiss(); // a new request begins: the last highlight goes
+        setPanel({ reply: "", phase: "listening" }); // and the last reply
       },
       onUpdate: (turn) => {
         lastTurn.current = turn;
@@ -443,16 +444,14 @@ export function VoiceIntent() {
 
   // Listening ended: the guess goes; the selection stays a while longer, then fades.
   useEffect(() => {
+    if (listen === "starting") setPanel({ reply: "", phase: "idle" }); // a new session starts clean
     if (listen !== "off") return;
     suggestion.current = null;
     agentRun.current?.abort.abort();
     highlights.clearGuess();
+    setPanel({ phase: "idle" }); // the last reply stays to read
     const t = highlights.expireSelection(SELECTION_AFTER_STOP_MS);
-    const s = window.setTimeout(() => setStatus(""), SELECTION_AFTER_STOP_MS);
-    return () => {
-      window.clearTimeout(t);
-      window.clearTimeout(s);
-    };
+    return () => window.clearTimeout(t);
   }, [listen]);
 
   return <HighlightLayer />;

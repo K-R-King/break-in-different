@@ -181,6 +181,7 @@ export const COPY = {
     dismissed: "Okay.",
     maybe: (name: string) => `${name}?`,
     thinking: "Thinking…",
+    startTalking: "Start talking…",
     chosen: (where: string | undefined, name: string) => (where ? `${where}: ${name}.` : `${name}.`),
     typing: (field: string) => `Typing in ${field}`,
     typed: (text: string) => `Typed "${text}".`,
