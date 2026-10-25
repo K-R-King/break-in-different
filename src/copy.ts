@@ -160,7 +160,7 @@ export const COPY = {
     button: "Voice control",
     connecting: "Starting…",
     reconnecting: "Reconnecting…",
-    muted: "Microphone muted",
+    muted: "Mic muted", // short: the voice button keeps the width of its longest label
     mutedNotice: "Your microphone is muted, so nothing is being heard. Unmute it to keep talking.",
     stopped: "Voice control off.",
     sayHint: "Say anything, like \"show remote jobs\" or \"go to settings\".",
