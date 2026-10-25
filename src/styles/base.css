@@ -168,49 +168,56 @@ html[data-layout="fit"] .profile-nav, html[data-layout="fit"] .profile-form { mi
 html[data-layout="fit"] .profile-nav { padding: 2px 4px 16px 2px; }
 html[data-layout="fit"] .profile-form { padding: 2px 8px 24px 2px; }
 
-/* Hero facts carousel: one active card, previews of its neighbours, seamless loop. */
+/* Hero facts carousel. Normal motion: a continuous marquee. Reduced motion: a cross-fading
+   stepper. Both keep the same card size, spacing and edge fade. */
 .stats-carousel {
   --peek: 56px;
   --gap: 16px;
   --card-w: calc(100% - 2 * (var(--peek) + var(--gap)));
+  --hover: 250ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  --crossfade: 700ms ease-in-out;
   flex: 1 1 520px;
   max-width: 580px;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 .stats-viewport {
+  display: grid; /* the outgoing cross-fade layer shares the track's cell */
+  grid-template-columns: minmax(0, 1fr); /* the track must be exactly the viewport's width */
   overflow: hidden;
-  /* Previews fade out at the edges; the active card is untouched. */
+  /* Cards fade out at the edges. */
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 calc(var(--peek) * 0.9), #000 calc(100% - var(--peek) * 0.9), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 calc(var(--peek) * 0.9), #000 calc(100% - var(--peek) * 0.9), transparent 100%);
-  padding-block: 6px;
+  /* Room for the hover enlargement and shadow without clipping; the negative margin keeps the
+     carousel's footprint in the hero unchanged. */
+  padding-block: 44px;
+  margin-block: -38px;
 }
 .stats-track {
+  grid-area: 1 / 1;
+  min-width: 0;
   display: flex;
   gap: var(--gap);
-  align-items: stretch; /* every card as tall as the tallest: no height change between facts */
-  /* Percentages here are the track's width, which equals the viewport's. */
-  transform: translateX(calc(var(--peek) + var(--gap) - var(--pos) * (var(--card-w) + var(--gap))));
-  will-change: transform;
+  align-items: stretch; /* every card as tall as the tallest */
 }
-.stats-track[data-animate="true"] {
-  transition: transform 700ms cubic-bezier(0.22, 0.61, 0.36, 1);
+.stat-slot {
+  flex: 0 0 var(--card-w);
+  min-width: 0;
+  display: flex;
 }
 .stat-card {
-  flex: 0 0 var(--card-w);
+  flex: 1 1 auto;
   min-width: 0;
   gap: 12px;
   justify-content: flex-start;
-  transform: scale(0.94);
   transform-origin: center;
+  transition: transform var(--hover), box-shadow var(--hover), border-color var(--hover);
 }
-.stat-card[data-active="true"] {
-  transform: none;
-}
-.stats-track[data-animate="true"] .stat-card {
-  transition: transform 700ms cubic-bezier(0.22, 0.61, 0.36, 1);
+.stat-card[data-hovered="true"] {
+  transform: scale(1.05);
+  box-shadow: 0 14px 34px rgba(20, 21, 26, 0.12), 0 2px 6px rgba(20, 21, 26, 0.06);
+  border-color: var(--line-strong);
 }
 .stat-figure {
   margin: 0;
@@ -228,13 +235,6 @@ html[data-layout="fit"] .profile-form { padding: 2px 8px 24px 2px; }
 .stat-source { margin-top: auto; padding-top: 2px; }
 .stat-points { margin: 0; padding-left: 1.2em; }
 .stat-points li + li { margin-top: 2px; }
-.stats-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-inline: calc(var(--peek) + var(--gap));
-}
 @media (max-width: 900px) {
   .stats-carousel { --peek: 32px; --gap: 12px; max-width: 600px; }
 }
@@ -243,6 +243,42 @@ html[data-layout="fit"] .profile-form { padding: 2px 8px 24px 2px; }
   .stat-figure-main { font-size: 2.7rem; }
   .stat-figure-sub { font-size: 1.6rem; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .stats-track[data-animate="true"], .stats-track[data-animate="true"] .stat-card { transition: none; }
+
+/* Marquee (normal motion). The track holds the facts three times; it starts with the second
+   copy's first card centred and slides left by exactly one sequence (--count cards) per loop.
+   At the end of each loop the view is identical to the start, so the repeat is invisible.
+   Percentages inside translateX are the track's width, which equals the viewport's.
+   The duration is set from the measured loop length so the speed stays at 40 px/s. */
+.stats-marquee {
+  --loop: calc(var(--count) * (var(--card-w) + var(--gap)));
+  animation: stats-marquee var(--marquee-duration, 40s) linear infinite;
+  will-change: transform;
+}
+.stats-marquee[data-paused="true"] {
+  animation-play-state: paused;
+}
+@keyframes stats-marquee {
+  from { transform: translateX(calc(var(--peek) + var(--gap) - var(--loop))); }
+  to { transform: translateX(calc(var(--peek) + var(--gap) - 2 * var(--loop))); }
+}
+
+/* Stepper (reduced motion, system or app setting): no movement and no scaling. Facts cross-fade
+   every 6 s: an outgoing copy of the cards fades out on top while the new fact is already in
+   place underneath. Opacity only, so it is exempt from the global "no animation" rules (higher
+   specificity, same !important). */
+.stats-stepper {
+  transform: translateX(calc(var(--peek) + var(--gap) - var(--pos) * (var(--card-w) + var(--gap))));
+}
+.stats-carousel[data-motion="reduced"] .stat-card {
+  transition: none !important;
+  transform: none !important;
+}
+.stats-carousel .stats-track-out {
+  z-index: 1;
+  pointer-events: none;
+  animation: stat-fade-out var(--crossfade) forwards !important;
+}
+@keyframes stat-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }

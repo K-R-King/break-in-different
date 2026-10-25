@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import { COPY } from "../copy";
 import { usePrefs } from "../a11y/prefs";
 
 type Stat = (typeof COPY.home.stats)[number];
 
-const INTERVAL_MS = 6000;
-const TRANSITION_MS = 700;
+const SPEED_PX_PER_S = 40; // marquee speed
+const STEP_MS = 6000; // reduced-motion cross-fade interval
+const MIN_RESUME_MS = 400;
 
 function usePrefersReducedMotion(): boolean {
   const { prefs } = usePrefs();
-  const [system, setSystem] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  const [system, setSystem] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   useEffect(() => {
     const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     if (!mq) return;
@@ -20,78 +21,179 @@ function usePrefersReducedMotion(): boolean {
   return system || prefs.reduceMotion;
 }
 
-// Looping facts carousel for the hero.
-//
-// Infinite loop: the track renders [clone of last, ...facts, clone of first]. Position 1 is the
-// first real card, so both neighbours always exist and their previews show at every step. After
-// sliding from the last real card onto the clone of the first (position N + 1), the track jumps
-// back to position 1 with transitions off; both show the same card in the same place, so the
-// jump is invisible.
-//
-// Autoplay pauses on hover, while the tab is hidden, and when the user presses Pause. The slides
-// hold nothing focusable, so focus never lands inside a moving card; the only control is Pause. With reduced motion (system or app setting) it starts paused and
-// steps without sliding.
+const isMouse = (e: PointerEvent) => e.pointerType === "mouse";
+
+function FactCard({ stat, label, hidden, hovered }: { stat: Stat; label?: string; hidden: boolean; hovered?: boolean }) {
+  return (
+    <article
+      className="card stat-card"
+      aria-hidden={hidden ? true : undefined}
+      aria-roledescription={hidden ? undefined : "slide"}
+      aria-label={hidden ? undefined : label}
+      data-hovered={hovered ? "true" : undefined}
+    >
+      <p className="stat-figure">
+        {stat.figure.map((part, k) => (
+          <span key={part} className={k === 0 ? "stat-figure-main" : "stat-figure-sub"}>
+            {part}
+          </span>
+        ))}
+      </p>
+      <p className="stat-statement">{stat.statement}</p>
+      {stat.context && <p className="small muted stat-context">{stat.context}</p>}
+      {stat.points.length > 0 && (
+        <ul className="small muted stat-points">
+          {stat.points.map((pt) => (
+            <li key={pt}>{pt}</li>
+          ))}
+        </ul>
+      )}
+      {stat.source && <p className="small muted stat-source">{stat.source}</p>}
+    </article>
+  );
+}
+
+// Hero facts carousel. No playback controls.
+// Normal motion: a continuous marquee. Reduced motion (system or app setting): a cross-fading stepper.
 export function StatsCarousel() {
+  const reduced = usePrefersReducedMotion();
+  return (
+    <section className="stats-carousel" aria-roledescription="carousel" aria-label={COPY.home.statsLabel} data-motion={reduced ? "reduced" : "full"}>
+      {reduced ? <FadeStepper /> : <Marquee />}
+    </section>
+  );
+}
+
+// Continuous marquee.
+//
+// The track renders the four facts three times. A CSS keyframe animation moves it left at a
+// constant speed by exactly one sequence length per loop, starting with the second copy's first
+// card centred. When the animation repeats, every card is back where the identical card was at
+// the start, so the loop boundary is invisible. The browser runs the animation; React does not
+// update per frame. The duration is set from the measured loop length (on mount and resize) so
+// the speed stays at 40 px/s on every screen size.
+//
+// Hover (mouse only): pointing at a visible card pauses the animation in place
+// (animation-play-state) and enlarges that card; leaving resumes from the same position. The
+// scale is on the card, not the track, so it never changes the track's transform or loop length.
+// Gaps, the faded edges and empty space never pause it. Only the middle copy is exposed to
+// assistive tech; the other two copies are aria-hidden.
+function Marquee() {
   const stats = COPY.home.stats;
   const total = stats.length;
-  const reduced = usePrefersReducedMotion();
-  const [pos, setPos] = useState(1);
-  const [animate, setAnimate] = useState(true);
-  const [userPaused, setUserPaused] = useState<boolean | null>(null); // null = default for the motion setting
-  const [hovering, setHovering] = useState(false);
-  const [hidden, setHidden] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
-  const paused = userPaused ?? reduced;
-  const running = !paused && !hovering && !hidden;
-  const active = (((pos - 1) % total) + total) % total;
-
-  useEffect(() => {
-    const on = () => setHidden(document.hidden);
-    document.addEventListener("visibilitychange", on);
-    return () => document.removeEventListener("visibilitychange", on);
-  }, []);
-
-  // Seamless wrap: from the clone of the first card back to the real first card, without a transition.
-  const wrapIfNeeded = useCallback(() => {
-    setPos((p) => {
-      if (p !== total + 1) return p;
-      setAnimate(false);
-      return 1;
-    });
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    const viewport = viewportRef.current;
+    if (!track || !viewport) return;
+    const measure = () => {
+      const slot = track.querySelector<HTMLElement>(".stat-slot");
+      if (!slot) return;
+      const loopPx = total * (slot.offsetWidth + parseFloat(getComputedStyle(track).columnGap || "0"));
+      if (loopPx > 0) track.style.setProperty("--marquee-duration", `${loopPx / SPEED_PX_PER_S}s`);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(viewport);
+    return () => ro.disconnect();
   }, [total]);
 
-  // Re-enable transitions after the wrap has been painted.
   useEffect(() => {
-    if (animate) return;
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setAnimate(true));
-    });
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, [animate]);
+    const clear = () => setHoveredKey(null);
+    window.addEventListener("blur", clear);
+    return () => window.removeEventListener("blur", clear);
+  }, []);
 
-  // Fallback if transitionend never fires (for example, the tab was hidden mid-slide).
+  // Pause for whichever card is under the pointer, but not in the gaps between cards or in the
+  // faded strips at the edges, where a card is barely visible.
+  const updateHover = (e: PointerEvent<HTMLDivElement>) => {
+    if (!isMouse(e)) return;
+    const viewport = viewportRef.current;
+    const card = (e.target as Element).closest<HTMLElement>(".stat-card");
+    if (!card || !viewport) return setHoveredKey(null);
+    const view = viewport.getBoundingClientRect();
+    const fade = parseFloat(getComputedStyle(viewport).getPropertyValue("--peek")) * 0.9 || 0;
+    const inside = e.clientX >= view.left + fade && e.clientX <= view.right - fade;
+    setHoveredKey(inside ? card.parentElement!.dataset.key! : null);
+  };
+
+  const copies = [0, 1, 2];
+  return (
+    <div
+      ref={viewportRef}
+      className="stats-viewport"
+      onPointerMove={updateHover}
+      onPointerOver={updateHover}
+      onPointerLeave={(e) => isMouse(e) && setHoveredKey(null)}
+    >
+      <div
+        ref={trackRef}
+        className="stats-track stats-marquee"
+        data-paused={hoveredKey ? "true" : "false"}
+        style={{ ["--count" as string]: total }}
+      >
+        {copies.flatMap((copy) =>
+          stats.map((stat, i) => {
+            const key = `${copy}-${i}`;
+            return (
+              <div key={key} className="stat-slot" data-key={key}>
+                <FactCard stat={stat} hidden={copy !== 1} label={COPY.home.statsCount(i + 1, total)} hovered={hoveredKey === key} />
+              </div>
+            );
+          }),
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Reduced-motion alternative: one fact at a time, cross-fading every 6 s, never moving or scaling.
+// The track renders [last, ...facts, first] so both neighbours exist as faded previews.
+// Hovering the visible active card pauses the countdown (it resumes with the time that was left);
+// a hidden tab pauses it too.
+function FadeStepper() {
+  const stats = COPY.home.stats;
+  const total = stats.length;
+  const [pos, setPos] = useState(1);
+  const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
+  const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.hidden);
+  const [fadeFrom, setFadeFrom] = useState<{ pos: number; key: number } | null>(null);
+  const posRef = useRef(pos);
+  const remainingRef = useRef(STEP_MS);
+  const running = !(hoveredSlot !== null && hoveredSlot === pos) && !hidden;
+
   useEffect(() => {
-    if (pos !== total + 1) return;
-    const t = window.setTimeout(wrapIfNeeded, reduced ? 0 : TRANSITION_MS + 150);
-    return () => window.clearTimeout(t);
-  }, [pos, total, reduced, wrapIfNeeded]);
+    const onVisibility = () => setHidden(document.hidden);
+    const onBlur = () => setHoveredSlot(null);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
 
   useEffect(() => {
     if (!running) return;
-    const t = window.setTimeout(() => {
-      if (reduced) setPos((p) => (p >= total ? 1 : p + 1));
-      else {
-        setAnimate(true);
-        setPos((p) => Math.min(p + 1, total + 1));
-      }
-    }, INTERVAL_MS);
-    return () => window.clearTimeout(t);
-  }, [running, pos, reduced, total]);
+    const first = Math.max(MIN_RESUME_MS, remainingRef.current);
+    let due = Date.now() + first;
+    let id = window.setTimeout(function tick() {
+      const p = posRef.current;
+      const next = p >= total ? 1 : p + 1;
+      posRef.current = next;
+      setFadeFrom({ pos: p, key: Date.now() });
+      setPos(next);
+      due = Date.now() + STEP_MS;
+      id = window.setTimeout(tick, STEP_MS);
+    }, first);
+    return () => {
+      window.clearTimeout(id);
+      remainingRef.current = Math.max(0, Math.min(STEP_MS, due - Date.now()));
+    };
+  }, [running, total]);
 
   const slides: { stat: Stat; real: number | null; key: string }[] = [
     { stat: stats[total - 1], real: null, key: "clone-last" },
@@ -99,65 +201,34 @@ export function StatsCarousel() {
     { stat: stats[0], real: null, key: "clone-first" },
   ];
 
-  return (
-    <section
-      className="stats-carousel"
-      aria-roledescription="carousel"
-      aria-label={COPY.home.statsLabel}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
+  const track = (at: number, outgoing: boolean) => (
+    <div
+      key={outgoing ? `out-${fadeFrom?.key}` : "track"}
+      className={outgoing ? "stats-track stats-stepper stats-track-out" : "stats-track stats-stepper"}
+      data-pos={outgoing ? undefined : at}
+      style={{ ["--pos" as string]: at }}
+      aria-hidden={outgoing ? true : undefined}
+      inert={outgoing ? true : undefined}
+      onAnimationEnd={outgoing ? () => setFadeFrom(null) : undefined}
     >
-      <div className="stats-viewport">
+      {slides.map(({ stat, real, key }, i) => (
         <div
-          ref={trackRef}
-          className="stats-track"
-          data-pos={pos}
-          data-animate={animate && !reduced ? "true" : "false"}
-          style={{ ["--pos" as string]: pos }}
-          onTransitionEnd={(e) => {
-            if (e.target === trackRef.current && e.propertyName === "transform") wrapIfNeeded();
-          }}
+          key={key}
+          className="stat-slot"
+          data-active={i === at ? "true" : "false"}
+          onPointerEnter={outgoing ? undefined : (e) => isMouse(e) && setHoveredSlot(i)}
+          onPointerLeave={outgoing ? undefined : (e) => isMouse(e) && setHoveredSlot((h) => (h === i ? null : h))}
         >
-          {slides.map(({ stat, real, key }, i) => (
-              <article
-                key={key}
-                className="card stat-card"
-                data-active={i === pos ? "true" : "false"}
-                // Clones duplicate real cards for the loop; only the four real cards reach assistive tech.
-                aria-hidden={real === null ? true : undefined}
-                aria-roledescription={real === null ? undefined : "slide"}
-                aria-label={real === null ? undefined : COPY.home.statsCount(real + 1, total)}
-              >
-                <p className="stat-figure">
-                  {stat.figure.map((part, k) => (
-                    <span key={part} className={k === 0 ? "stat-figure-main" : "stat-figure-sub"}>
-                      {part}
-                    </span>
-                  ))}
-                </p>
-                <p className="stat-statement">{stat.statement}</p>
-                {stat.context && <p className="small muted stat-context">{stat.context}</p>}
-                {stat.points.length > 0 && (
-                  <ul className="small muted stat-points">
-                    {stat.points.map((pt) => (
-                      <li key={pt}>{pt}</li>
-                    ))}
-                  </ul>
-                )}
-                {stat.source && <p className="small muted stat-source">{stat.source}</p>}
-              </article>
-          ))}
+          <FactCard stat={stat} hidden={outgoing || real === null} label={real === null ? undefined : COPY.home.statsCount(real + 1, total)} />
         </div>
-      </div>
-      <div className="stats-controls">
-        {/* Not a live region: autoplay must not announce every change. */}
-        <span className="small muted" data-testid="stats-count">
-          {COPY.home.statsCount(active + 1, total)}
-        </span>
-        <button type="button" className="btn-link small" onClick={() => setUserPaused(!paused)}>
-          {paused ? COPY.home.statsPlay : COPY.home.statsPause}
-        </button>
-      </div>
-    </section>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="stats-viewport">
+      {track(pos, false)}
+      {fadeFrom && track(fadeFrom.pos, true)}
+    </div>
   );
 }

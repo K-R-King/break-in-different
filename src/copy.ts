@@ -52,8 +52,7 @@ export const COPY = {
         source: "Source: Forbes, “53% Of Gen Z Say They’re Neurodivergent,” September 2026.",
       },
     ],
-    statsPause: "Pause facts",
-    statsPlay: "Play facts",
+    // Accessible name of each fact (not shown on screen).
     statsCount: (n: number, total: number) => `Fact ${n} of ${total}`,
     placesTitle: "Your three places",
     places: [
