@@ -19,10 +19,41 @@ export const COPY = {
     ctaPrimary: "Create your free account",
     ctaSettings: "Adjust text and reading first",
     noAccount: "No account needed to change fonts, text size or spacing. No diagnosis needed, ever.",
-    statFigure: "53%",
-    statLine: "of Gen Z say they are neurodivergent.",
-    statCaveat:
-      "Self-reported in a 2023 ZenBusiness survey of about 1,000 people aged 18–25, cited by Forbes (Sept 2026). It is not a prevalence rate, but it shows how many people need job tools that flex.",
+    statsLabel: "Facts about disability and work",
+    // Hero facts carousel. Figures and attributions must match their sources exactly.
+    stats: [
+      {
+        figure: ["53%"],
+        statement: "of Gen Z say they are neurodivergent.",
+        context:
+          "Self-reported in a 2023 ZenBusiness survey of about 1,000 people aged 18–25, cited by Forbes (September 2026). This is not a prevalence rate, but it shows how many people need job tools that flex.",
+        points: [],
+        source: "",
+      },
+      {
+        figure: ["38.1%", "vs. 74.8%"],
+        statement: "People with disabilities are employed at about half the rate of people without disabilities.",
+        context: "In 2025, among people ages 16–64, 38.1% of people with a disability were employed, compared with 74.8% of people without one.",
+        points: [],
+        source: "Source: U.S. Bureau of Labor Statistics, People with a Disability: Labor Force Characteristics, 2025.",
+      },
+      {
+        figure: ["13%"],
+        statement: "of the U.S. population had a disability in 2025.",
+        context: "People with disabilities represent a substantial part of the population and workforce.",
+        points: [],
+        source: "Source: U.S. Bureau of Labor Statistics, 2025.",
+      },
+      {
+        figure: ["37%"],
+        statement: "said workplace accommodation requests took too long to process.",
+        context: "Among people who requested neurodiversity accommodations at work:",
+        points: ["37% said the process dragged.", "28% feared retaliation.", "Managers turned down one in five requests."],
+        source: "Source: Forbes, “53% Of Gen Z Say They’re Neurodivergent,” September 2026.",
+      },
+    ],
+    // Accessible name of each fact (not shown on screen).
+    statsCount: (n: number, total: number) => `Fact ${n} of ${total}`,
     placesTitle: "Your three places",
     places: [
       { title: "Profile", text: "Your skills, the roles you want, and the accommodations you need from an employer.", to: "/profile" },
