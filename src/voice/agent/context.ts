@@ -1,6 +1,7 @@
 // What the voice assistant is told about the page: its purpose, the controls (with ids from the
 // scan), their state, and the visible text of the main area. Nothing marked private (disability
-// details) or dangerous is included, and the size is capped so replies stay fast.
+// details) or dangerous is included, except a private region's public name so the assistant can
+// take the person there; the size is capped so replies stay fast.
 import type { Target } from "../intent/scan";
 import type { Guidance } from "./settings";
 import { pageInfo } from "./pages";
@@ -48,8 +49,10 @@ export function buildAgentRequest(opts: {
   history: AgentTurn[];
 }) {
   const { targets } = opts;
-  // Never private or dangerous; not the page already open (nothing to do there).
-  const allowed = (t: Target) => !t.private && !t.danger && !t.current;
+  // Never private or dangerous; not the page already open (nothing to do there). A private region
+  // with a public name is only somewhere to go: that name and nothing more.
+  const shell = (t: Target) => !!t.private && t.kind === "group" && !!t.publicName;
+  const allowed = (t: Target) => (!t.private || shell(t)) && !t.danger && !t.current;
   // Most relevant first: keyword guesses, the selection, what is on screen, then the rest.
   const first = new Set([...(opts.guesses ?? []), ...(opts.selection !== undefined ? [opts.selection] : [])]);
   const ranked = [
@@ -64,16 +67,19 @@ export function buildAgentRequest(opts: {
     guidance: opts.guidance,
     selection: opts.selection,
     guesses: opts.guesses,
-    targets: ranked.slice(0, MAX_TARGETS).map((t) => ({
-      id: t.id,
-      kind: t.run && t.kind === "radio" ? "option" : t.kind,
-      label: t.label,
-      names: t.names.filter((n) => n !== t.label).slice(0, 3),
-      group: groupPath(t, targets),
-      state: stateOf(t),
-      say: t.el.dataset.voiceSay,
-      confirm: t.el.hasAttribute("data-voice-confirm") || undefined,
-    })),
+    targets: ranked.slice(0, MAX_TARGETS).map((t) => {
+      if (shell(t)) return { id: t.id, kind: t.kind, label: t.publicName!, names: [] };
+      return {
+        id: t.id,
+        kind: t.run && t.kind === "radio" ? "option" : t.kind,
+        label: t.label,
+        names: t.names.filter((n) => n !== t.label).slice(0, 3),
+        group: groupPath(t, targets),
+        state: stateOf(t),
+        say: t.el.dataset.voiceSay,
+        confirm: t.el.hasAttribute("data-voice-confirm") || undefined,
+      };
+    }),
     history: opts.history.slice(-8),
   };
 }

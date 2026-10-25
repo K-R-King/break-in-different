@@ -511,7 +511,8 @@ function PrivateSection(p: {
   }, [p, prefs, update, dismissed]);
 
   return (
-    <section id="s4" className="card" aria-labelledby="s4-h" style={{ background: "var(--surface-2)" }} data-voice-private>
+    <section id="s4" className="card" aria-labelledby="s4-h" style={{ background: "var(--surface-2)" }} data-voice-private
+      data-voice-public-name="4. About you (private)">
       <details>
         <summary style={{ cursor: "pointer", listStyle: "none" }} data-voice-command data-voice-label="Your disability or neurodivergence (private)"
           data-voice-names="show or hide|disability|neurodivergence|about you|private section">

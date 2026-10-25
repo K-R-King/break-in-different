@@ -7,6 +7,8 @@
 //   data-voice-command     saying its name performs it (Read aloud, Pause, Stop), no verb needed;
 //                          on a toggle, ="on" or ="off" says which way (Save / Unsave)
 //   data-voice-private     never described to the assistant (disability details); still usable
+//   data-voice-public-name="…"  on a private region: the assistant may take the person there by
+//                          this name, and is told nothing else about it ("4. About you (private)")
 //   data-voice-primary     the main region of the page (the open job), preferred when unsure
 //   data-voice-danger      irreversible: voice may point at it but never press it
 // Voice-only commands registered by pages (actions.ts) are added as targets too.
@@ -21,6 +23,7 @@ export interface Target extends Candidate {
   command?: boolean; // its name is the command: say it and it happens
   commandWay?: "on" | "off"; // for a toggle command: which way saying its name turns it
   private?: boolean; // never described to the assistant
+  publicName?: string; // a private region's name the assistant may use to go there (nothing else)
   primary?: boolean; // the page's main region
   run?: () => unknown; // a voice-only command (actions.ts)
   message?: string | (() => string);
@@ -172,6 +175,7 @@ export function scanPage(root: ParentNode = document): Target[] {
       // The item already open (the selected job's card): its details are shown elsewhere.
       current: el.getAttribute("aria-current") === "true" || el.getAttribute("aria-current") === "page",
       private: !!el.closest("[data-voice-private]"),
+      publicName: el.dataset.voicePublicName,
       primary: el.hasAttribute("data-voice-primary"),
     });
   }
@@ -305,13 +309,16 @@ export function canonicalize(list: Target[]): Target[] {
   for (const t of list) if (t.hidden && t.kind !== "group" && visible.has(meaning(t))) gone.add(t.id);
 
   // A table-of-contents link ("2. Features to apply" in the Profile's section list) is the
-  // section it jumps to.
+  // section it jumps to, and a numbered one is also "section 2".
   for (const t of list) {
     const href = t.kind === "link" ? t.el.getAttribute("href") : null;
     if (!href?.startsWith("#") || href.length < 2 || !t.el.closest("nav") || gone.has(t.id)) continue;
     const dest = document.getElementById(href.slice(1));
     const section = dest && list.find((g) => g.kind === "group" && g.el === dest && !gone.has(g.id));
-    if (section) absorb(section, t);
+    if (!section) continue;
+    absorb(section, t);
+    const n = /^(\d+)[.)]\s/.exec(t.label)?.[1];
+    if (n) section.names = unique([...section.names, `section ${n}`]);
   }
 
   // The controls each group contains (any depth).

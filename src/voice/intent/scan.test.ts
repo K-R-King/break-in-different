@@ -36,6 +36,20 @@ describe("canonicalize", () => {
     expect(out[0].names).toEqual(["Jobs Listing", "Go to jobs"]);
   });
 
+  it("names a section after its numbered table-of-contents link", () => {
+    const sec = el("section");
+    sec.id = "s4";
+    const nav = el("nav");
+    const link = el("a", "#s4");
+    link.setAttribute("href", "#s4");
+    nav.append(link);
+    document.body.append(sec, nav);
+    const out = canonicalize([t(0, "group", ["4. Your disability or neurodivergence"], undefined, sec), t(1, "checkbox", ["ADHD"], 0), t(2, "checkbox", ["Dyslexia"], 0), t(3, "link", ["4. About you"], undefined, link)]);
+    expect(out[0].names).toEqual(["4. Your disability or neurodivergence", "4. About you", "section 4"]);
+    sec.remove();
+    nav.remove();
+  });
+
   it("keeps text-only regions for reading", () => {
     expect(canonicalize([t(0, "group", ["About the role"])])).toHaveLength(1);
   });

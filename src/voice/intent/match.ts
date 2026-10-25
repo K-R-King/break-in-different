@@ -133,10 +133,16 @@ export function stem(w: string): string {
   return w;
 }
 
+// "Section four" is "section 4", the name the Profile's numbered sections answer to (scan.ts).
+// Speech-to-text often hears "section for" or "section to": taken as numbers only at the end,
+// so "the section for roles" keeps its "for".
+const NUMBER: Record<string, string> = { one: "1", won: "1", two: "2", to: "2", too: "2", three: "3", four: "4", for: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10" };
+const NUMBERED = /\b(section|step|part) (one|two|three|four|five|six|seven|eight|nine|ten|(?:won|to|too|for)(?=\s*$))\b/g;
+
 function normalize(text: string): string {
   let s = ` ${text.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' -]+/g, " ")} `;
   for (const [re, tok] of SYNONYMS) s = s.replace(re, tok);
-  return s;
+  return s.replace(NUMBERED, (_, w: string, n: string) => `${w} ${NUMBER[n]}`);
 }
 
 const tokenCache = new Map<string, string[]>();

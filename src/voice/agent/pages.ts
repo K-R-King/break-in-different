@@ -5,7 +5,7 @@ const PAGES: [RegExp, string, string][] = [
   [
     /^\/profile/,
     "Profile",
-    "The profile, in sections: 1 resume and skills (upload a PDF, or add skills one at a time in the Add a skill box), 2 accessibility features for this app, 3 workplace accommodations (Required, Preferred or Not needed for each), 4 private details that are never shared, 5 roles and where they want to work. Save, or Save and find jobs, is at the bottom.",
+    "The profile, in sections: 1 resume and skills (upload a PDF, or add skills one at a time in the Add a skill box), 2 accessibility features for this app, 3 workplace accommodations (Required, Preferred or Not needed for each), 4 About you (private details, never shared; you are not told what is inside it, but you can take them there), 5 roles and where they want to work. The optional name box at the top is not a numbered section. Save, or Save and find jobs, is at the bottom.",
   ],
   [
     /^\/jobs\/[^/]+\/email/,

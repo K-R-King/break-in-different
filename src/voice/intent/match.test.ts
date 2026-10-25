@@ -220,3 +220,33 @@ describe("action words in a control's name", () => {
   });
 });
 
+
+// The Profile's numbered sections (after scan.ts names each "section N"), with the private
+// section's show-or-hide summary inside section 4.
+describe("profile sections by number", () => {
+  const P: Candidate[] = [
+    { id: 0, kind: "group", names: ["Profile sections"] },
+    { id: 1, kind: "group", names: ["1. Upload your resume", "1. Resume and skills", "section 1"] },
+    { id: 2, kind: "group", names: ["2. Accessibility features you need to apply for jobs", "2. Features to apply", "section 2"] },
+    { id: 3, kind: "group", names: ["3. Accommodations you require from your employer", "3. Employer accommodations", "section 3"] },
+    { id: 4, kind: "group", names: ["4. Your disability or neurodivergence", "4. About you", "section 4"] },
+    { id: 5, kind: "button", names: ["Your disability or neurodivergence (private)", "show or hide", "about you", "private section"], parent: 4 },
+    { id: 6, kind: "group", names: ["5. Roles you are interested in", "5. Roles and location", "section 5"] },
+  ];
+
+  it("goes to the section itself, not the private section's show-or-hide button", () => {
+    expect(bestMatch("go to section 4", P)).toMatchObject({ id: 4, verb: "go", confident: true, simple: true });
+    expect(bestMatch("section 4", P)).toMatchObject({ id: 4, confident: true, simple: true });
+  });
+
+  it("understands the number as a word, including how speech-to-text mishears it", () => {
+    expect(bestMatch("go to section four", P)).toMatchObject({ id: 4, simple: true });
+    expect(bestMatch("go to section for", P)).toMatchObject({ id: 4, simple: true });
+    expect(bestMatch("take me to section two", P)).toMatchObject({ id: 2, simple: true });
+    expect(bestMatch("section 5", P)).toMatchObject({ id: 6, simple: true });
+  });
+
+  it("keeps a real 'for' in the middle of a sentence", () => {
+    expect(bestMatch("go to the section for roles and location", P)).toMatchObject({ id: 6 });
+  });
+});
