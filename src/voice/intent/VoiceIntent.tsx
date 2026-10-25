@@ -412,6 +412,7 @@ export function VoiceIntent() {
       onStart: () => {
         void scanCached();
         speaker.stop(); // the person is talking: stop speaking
+        highlights.dismiss(); // a new request begins: the last highlight goes
       },
       onUpdate: (turn) => {
         lastTurn.current = turn;
