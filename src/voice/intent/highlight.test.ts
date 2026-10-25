@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { highlights, shown } from "./highlight";
 
 const el = () => document.body.appendChild(document.createElement("button"));
@@ -33,5 +33,43 @@ describe("highlights", () => {
     expect(visible()).toEqual(["unsure:Remote"]);
     highlights.clearGuess();
     expect(visible()).toEqual(["done:Reduce motion: off."]);
+  });
+});
+
+describe("highlights go away when something new starts", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    highlights.clearAll();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("fades a finished or waiting highlight after 3 seconds with nothing new", () => {
+    highlights.done(el(), "Saved.");
+    vi.advanceTimersByTime(2900);
+    expect(highlights.get()[0].fading).toBeFalsy();
+    vi.advanceTimersByTime(200);
+    expect(highlights.get()[0].fading).toBe(true);
+    vi.advanceTimersByTime(1300);
+    expect(highlights.get()).toHaveLength(0);
+
+    highlights.guess(el(), "Remote", "unsure");
+    vi.advanceTimersByTime(3100);
+    expect(highlights.get()[0].fading).toBe(true);
+  });
+
+  it("restarts the wait when a newer highlight replaces it", () => {
+    highlights.done(el(), "First.");
+    vi.advanceTimersByTime(2000);
+    highlights.done(el(), "Second.");
+    vi.advanceTimersByTime(2000);
+    expect(visible()).toEqual(["done:Second."]);
+    expect(highlights.get()[0].fading).toBeFalsy();
+  });
+
+  it("dismiss() clears everything except an action still running", () => {
+    highlights.done(el(), "Saved.");
+    highlights.doing(el(), "Press: Apply");
+    highlights.dismiss();
+    expect(highlights.get().filter((h) => !h.fading).map((h) => h.state)).toEqual(["doing"]);
   });
 });

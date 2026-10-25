@@ -3,29 +3,34 @@ import { Icon } from "../../components/Icon";
 import { COPY } from "../../copy";
 import { formatCombo, isCapturing, isModifierCode, matchesCombo, useVoiceKey } from "../hotkey";
 import { useLiveVoice } from "./LiveVoice";
-import { useIntentStatus } from "../intent/VoiceIntent";
+import { useVoicePanel } from "../intent/VoiceIntent";
 import "./voice.css";
 
 // Top-layer support (all current browsers); without it the button simply stays in the header.
 const POPOVER = typeof HTMLElement !== "undefined" && "popover" in HTMLElement.prototype;
 
-const LINGER_MS = 12000; // the last line heard stays under the button this long after listening ends
+const LINGER_MS = 12000;
+// Every label the button can show (they share one space; see .voice-label).
+const LABELS = [COPY.voice.button, COPY.voice.stopListening, COPY.voice.connecting, COPY.voice.reconnecting, COPY.voice.muted]; // the last line heard stays under the button this long after listening ends
 
-// The voice control button: green glow while the microphone is really being heard, the line being
-// heard underneath it in real time. The glow fades out when listening ends.
+// The voice control button: green glow while the microphone is really being heard; the glow fades
+// out when listening ends. Under it, two rows: what the person is saying (or a prompt to start),
+// and the assistant's reply (or a shimmering "Listening…" / "Thinking…"). Both reset when the
+// person speaks again.
 // The shortcut is the one set in Accessibility settings (default Ctrl+Space): in "hold" mode, talk
 // while holding it; in "toggle" mode, press once to start and again to stop. Enter or Space on the
 // focused button also toggles it.
 export function VoiceButton() {
   const v = useLiveVoice();
-  const heardRef = useRef<HTMLParagraphElement>(null);
-  const intent = useIntentStatus();
+  const replyRef = useRef<HTMLParagraphElement>(null);
+  const panel = useVoicePanel();
   const { combo, mode } = useVoiceKey();
   const descId = useId();
   const on = v.status !== "off";
   const heard = v.status === "listening" && !v.muted;
   const shortcut = formatCombo(combo);
 
+  // While on, the button says what a click does (stop); the panel shows that it is listening.
   const label =
     v.status === "starting"
       ? COPY.voice.connecting
@@ -34,17 +39,19 @@ export function VoiceButton() {
         : v.status === "listening"
           ? v.muted
             ? COPY.voice.muted
-            : COPY.voice.listening
+            : COPY.voice.stopListening
           : COPY.voice.button;
+  const hint = on ? COPY.voice.clickToStop(shortcut) : COPY.voice.clickToStart(shortcut);
 
-  // Keep the last line visible for a moment after listening ends.
+  // Keep the last words visible for a moment after listening ends.
   const [linger, setLinger] = useState(false);
+  const lastWords = v.heard || panel.reply;
   useEffect(() => {
-    if (on || !v.transcript) return setLinger(false);
+    if (on || !lastWords) return setLinger(false);
     setLinger(true);
     const t = window.setTimeout(() => setLinger(false), LINGER_MS);
     return () => window.clearTimeout(t);
-  }, [on, v.transcript]);
+  }, [on, lastWords]);
 
   const latest = useRef({ v, mode });
   latest.current = { v, mode };
@@ -86,11 +93,11 @@ export function VoiceButton() {
     };
   }, [combo]);
 
-  // A long command scrolls inside the panel; keep the newest words in view.
+  // A long reply scrolls inside the panel; keep the newest words in view.
   useEffect(() => {
-    const el = heardRef.current;
+    const el = replyRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [v.transcript]);
+  }, [panel.reply]);
 
   const showPanel = on || linger || !!v.notice;
 
@@ -189,7 +196,8 @@ export function VoiceButton() {
           data-state={v.status}
           data-heard={heard}
           data-testid="voice-button"
-          aria-pressed={on}
+          data-on={on}
+          title={hint}
           aria-describedby={descId}
           aria-keyshortcuts={[
             combo.ctrl && "Control",
@@ -202,13 +210,21 @@ export function VoiceButton() {
             .join("+")}
           onClick={v.toggle}
         >
-          <Icon name="mic" />
-          {label}
+          <Icon name={on ? "stop" : "mic"} filled={on} size={20} />
+          {/* Every label sits in the same grid cell, so the button keeps the width of the longest
+              one and never changes size as it toggles. Hidden labels are not read out. */}
+          <span className="voice-label">
+            {LABELS.map((l) => (
+              <span key={l} data-shown={l === label} aria-hidden={l !== label}>
+                {l}
+              </span>
+            ))}
+          </span>
           <kbd className="kbd">{shortcut}</kbd>
         </button>
       </div>
       <span id={descId} className="sr-only">
-        {COPY.voice.shortcut(shortcut)} {COPY.voice.privacy}
+        {hint} {COPY.voice.privacy}
       </span>
       {showPanel && (
         <div
@@ -219,30 +235,23 @@ export function VoiceButton() {
           role="region"
           aria-label={COPY.voice.button}
         >
-          <p ref={heardRef} className="voice-heard" data-testid="voice-transcript" data-final={v.final} aria-hidden="true">
-            {v.transcript && (on || linger) ? <>“{v.transcript}”</> : heard ? <span className="muted">{COPY.voice.sayHint}</span> : null}
+          {/* Row 1: what they are saying now, or a prompt to start. */}
+          <p className="voice-said" data-testid="voice-transcript" data-final={v.final} aria-hidden="true">
+            {v.heard ? v.heard : heard ? <span className="voice-hint">{COPY.voice.startTalking}</span> : null}
           </p>
-          {intent && (
-            <p className="voice-intent" data-testid="voice-intent">
-              → {intent}
-            </p>
-          )}
-          {notice && (
-            <p className="small muted" style={{ margin: 0 }} data-testid="voice-message">
-              {notice}
-            </p>
-          )}
-          {on && (
-            <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
-              <span className="voice-meter" aria-hidden="true">
-                <span style={{ transform: `scaleX(${heard ? v.level : 0})` }} />
+          {/* Row 2: the assistant's reply, or that it is listening or thinking. Screen readers hear
+              replies through the announcer, so this is visual only. */}
+          <p ref={replyRef} className="voice-reply" data-testid="voice-reply" aria-hidden="true">
+            {notice ? (
+              notice
+            ) : panel.phase === "thinking" || (panel.phase === "listening" && heard && !panel.reply) ? (
+              <span className="voice-shimmer" data-testid="voice-phase">
+                {panel.phase === "thinking" ? COPY.voice.thinking : COPY.voice.listening}
               </span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={v.stop}>
-                <Icon name="x" size={16} />
-                Stop
-              </button>
-            </div>
-          )}
+            ) : (
+              panel.reply
+            )}
+          </p>
         </div>
       )}
     </div>

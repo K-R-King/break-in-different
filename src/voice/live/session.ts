@@ -9,6 +9,7 @@ export type ListenStatus = "off" | "starting" | "listening" | "reconnecting";
 export interface ListenSnapshot {
   status: ListenStatus;
   transcript: string; // the whole command heard and not yet acted on, updated word by word
+  heard: string; // what is being said now: this turn only, cleared when the person speaks again
   final: boolean; // the speaker paused (the last turn ended)
   notice: string;
   level: number; // microphone loudness 0..1
@@ -30,7 +31,7 @@ export interface SessionDeps {
   keyterms?: () => string[];
 }
 
-const OFF: ListenSnapshot = { status: "off", transcript: "", final: false, notice: "", level: 0, muted: false };
+const OFF: ListenSnapshot = { status: "off", transcript: "", heard: "", final: false, notice: "", level: 0, muted: false };
 
 export class ListenSession {
   private snap: ListenSnapshot = OFF;
@@ -86,18 +87,21 @@ export class ListenSession {
           if (s === "open") this.set({ status: "listening", notice: "" });
           else if (s === "reconnecting") this.set({ status: "reconnecting" });
         },
-        onTurnStart: () => this.turns.onStart?.(),
+        onTurnStart: () => {
+          this.set({ heard: "" });
+          this.turns.onStart?.();
+        },
         onUpdate: (t) => {
-          this.set({ transcript: this.pending.update(t), final: false });
+          this.set({ transcript: this.pending.update(t), heard: t, final: false });
           this.turns.onUpdate?.(t);
         },
         onEagerEnd: (t) => {
-          this.set({ transcript: this.pending.update(t) });
+          this.set({ transcript: this.pending.update(t), heard: t });
           this.turns.onEagerEnd?.(t);
         },
         onResume: () => this.turns.onResume?.(),
         onEnd: (t) => {
-          this.set({ transcript: this.pending.end(t), final: true });
+          this.set({ transcript: this.pending.end(t), heard: t, final: true });
           this.turns.onEnd?.(t);
         },
         onFatal: (why) => this.fail(this.deps.copy.failed(why)),
@@ -122,7 +126,7 @@ export class ListenSession {
     this.socket?.close(flush);
     this.mic = null;
     this.socket = null;
-    this.set({ ...OFF, transcript: this.snap.transcript, final: true });
+    this.set({ ...OFF, transcript: this.snap.transcript, heard: this.snap.heard, final: true });
   }
 
   // The action recognizer acted on everything heard so far: drop it from the shown command.
