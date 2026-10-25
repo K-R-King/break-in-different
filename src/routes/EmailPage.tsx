@@ -59,6 +59,15 @@ export default function EmailPage() {
     if (sensitive) setConditions(sensitive.selected);
   }, [profile, latest, sensitive]);
 
+  // Prefill "To" once with the address the listing gives for accommodation requests.
+  const contactEmail = job?.accommodationContact?.email ?? "";
+  const toPrefilled = useRef(false);
+  useEffect(() => {
+    if (toPrefilled.current || !contactEmail) return;
+    toPrefilled.current = true;
+    setTo((t) => t || contactEmail);
+  }, [contactEmail]);
+
   // Keep the editor in step with the stored draft unless the user has unsaved edits.
   useEffect(() => {
     if (latest && !dirty) {
@@ -358,8 +367,15 @@ export default function EmailPage() {
 
           <div className="field">
             <label htmlFor="to" className="label">To</label>
-            <p id="to-hint" className="hint">{COPY.email.recipientHint}</p>
-            <input id="to" className="input" type="email" value={to} data-voice-names="recipient|email address|send to" aria-describedby="to-hint" onChange={(e) => setTo(e.target.value)} />
+            {contactEmail && to === contactEmail ? (
+              <div id="to-hint" className="hint stack" style={{ gap: 4 }} data-testid="to-from-listing">
+                <span>{COPY.email.recipientFromListing}</span>
+                <blockquote className="quote">Listing says: "{job.accommodationContact?.quote}"</blockquote>
+              </div>
+            ) : (
+              <p id="to-hint" className="hint">{COPY.email.recipientHint}</p>
+            )}
+            <input id="to" className="input" type="email" value={to} aria-describedby="to-hint" onChange={(e) => setTo(e.target.value)} />
           </div>
           <div className="field">
             <label htmlFor="subj" className="label">Subject</label>

@@ -3,11 +3,15 @@
 # Reads the public Greenhouse and Lever APIs directly (they return listing HTML, which is where
 # accommodation form links are found), runs at about 1 request per second, and keeps only the
 # listings this run fetched, so the new snapshot replaces the old one.
-# Needs the stack running (./scripts/demo.sh up).
+# Needs the stack running (./scripts/demo.sh up or ./scripts/demo-docker.sh up).
 set -eu
 cd "$(dirname "$0")/.."
 : "${CONVEX_SELF_HOSTED_URL:=http://127.0.0.1:3210}"
-: "${CONVEX_SELF_HOSTED_ADMIN_KEY:=$(grep '^CONVEX_SELF_HOSTED_ADMIN_KEY=' .env.docker | cut -d= -f2-)}"
+if [ -z "${CONVEX_SELF_HOSTED_ADMIN_KEY:-}" ]; then
+  # The no-Docker backend keeps its key in .demo-local/env, the Docker one in .env.docker.
+  if [ -f .demo-local/run/backend.pid ] && kill -0 "$(cat .demo-local/run/backend.pid)" 2>/dev/null; then KEYS=.demo-local/env; else KEYS=.env.docker; fi
+  CONVEX_SELF_HOSTED_ADMIN_KEY=$(grep '^CONVEX_SELF_HOSTED_ADMIN_KEY=' "$KEYS" | cut -d= -f2-)
+fi
 export CONVEX_SELF_HOSTED_URL CONVEX_SELF_HOSTED_ADMIN_KEY
 
 SINCE=$(node -e 'process.stdout.write(String(Date.now()))')

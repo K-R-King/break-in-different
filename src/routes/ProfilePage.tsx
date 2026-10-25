@@ -16,6 +16,7 @@ import { SPACING_DEFAULT, SPACING_PRESET, spacingOn, usePrefs } from "../a11y/pr
 import { Icon } from "../components/Icon";
 import { ACCOMMODATION_VOICE, ROLE_VOICE, voiceNames } from "../voice/vocabulary";
 import { toAppError } from "../lib/errors";
+import { useFitLayout } from "../lib/useFitLayout";
 
 const ROLE_HINTS: Record<ChosenRole, string> = {
   full_stack_developer: "Also shows close matches like Frontend and Backend Engineer",
@@ -127,12 +128,16 @@ export default function ProfilePage() {
     navigate("/jobs");
   };
 
+  // Wide screens: the section list and progress stay in view while the form scrolls (styles in base.css).
+  const pageRef = useRef<HTMLElement>(null);
+  useFitLayout(pageRef, { minWidth: 960, minHeight: 360, enabled: profile !== undefined });
+
   if (profile === undefined) return <main id="main" className="container" style={{ paddingBlock: 40 }} role="status">Loading your profile…</main>;
 
   return (
     <>
-      <main id="main" className="container" style={{ paddingTop: 40, display: "flex", flexWrap: "wrap", gap: 32, alignItems: "flex-start" }}>
-        <nav aria-label="Profile sections" className="stack" style={{ flex: "1 1 240px" }}>
+      <main id="main" className="container profile-page" ref={pageRef}>
+        <nav aria-label="Profile sections" className="stack profile-nav">
           <PageHeading>{COPY.profile.title}</PageHeading>
           <div>
             <p style={{ margin: "0 0 8px", fontWeight: 700 }} id="progress-label">{doneCount} of 5 sections done</p>
@@ -153,7 +158,7 @@ export default function ProfilePage() {
           </ol>
         </nav>
 
-        <div className="stack" style={{ flex: "999 1 600px", minWidth: 0, gap: 24, paddingBottom: 32 }}>
+        <div className="stack profile-form" data-voice-scroll>
           {errors.form && <div className="callout callout-error" role="alert"><Icon name="alert" />{errors.form}</div>}
           <section className="card" aria-labelledby="name-h" style={{ gap: 10 }}>
             <h2 id="name-h" style={{ margin: 0, fontSize: "1.4rem" }}>Your name <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></h2>

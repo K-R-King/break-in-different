@@ -16,6 +16,7 @@ import { useVoiceHandlers } from "../voice/VoiceProvider";
 import { useVoiceActions } from "../voice/intent/actions";
 import { ACCOMMODATION_VOICE, voiceNames } from "../voice/vocabulary";
 import { toAppError } from "../lib/errors";
+import { useFitLayout } from "../lib/useFitLayout";
 
 const MIN_COLUMN_HEIGHT = 360;
 
@@ -36,7 +37,8 @@ export default function JobsPage() {
   const [workSetup, setWorkSetup] = useState<"remote" | "onsite" | "any">("any");
   const [locationText, setLocationText] = useState("");
   const [experience, setExperience] = useState<string[]>([]);
-  const [statesAll, setStatesAll] = useState(false);
+  const [hideConflicts, setHideConflicts] = useState(false);
+  const [formOnly, setFormOnly] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [running, setRunning] = useState(false);
@@ -45,9 +47,18 @@ export default function JobsPage() {
   const autoRan = useRef(false);
 
   const data = useQuery(api.matches.list, {
-    workSetup, locationText: locationText.trim() || undefined, statesAllRequired: statesAll || undefined,
-    experience: experience.length ? experience : undefined, search: search.trim() || undefined,
+    workSetup, locationText: locationText.trim() || undefined, hideConflicts: hideConflicts || undefined,
+    experience: experience.length ? experience : undefined, search: search.trim() || undefined, hasForm: formOnly || undefined,
   });
+  // When the accommodation filters leave nothing, the same search without them offers a way forward.
+  const accFiltersOn = hideConflicts || formOnly;
+  const unfiltered = useQuery(
+    api.matches.list,
+    data && data.items.length === 0 && accFiltersOn
+      ? { workSetup, locationText: locationText.trim() || undefined, experience: experience.length ? experience : undefined, search: search.trim() || undefined }
+      : "skip",
+  );
+  const topUnfiltered = unfiltered?.items[0];
 
   const doRun = async () => {
     setRunning(true);
@@ -144,29 +155,8 @@ export default function JobsPage() {
   const incomplete = profile !== undefined && (!profile || !profile.skills.length || !profile.roleIds.length);
 
   // Wide screens: the page stops scrolling and each column scrolls on its own (styles in base.css).
-  // Only when the columns still get a useful height; with large text the page scrolls as usual.
   const layoutRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (incomplete) return;
-    const root = document.documentElement;
-    const check = () => {
-      const el = layoutRef.current;
-      if (!el) return;
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      const footer = document.querySelector(".footer")?.getBoundingClientRect().height ?? 0;
-      if (window.innerHeight - top - footer - 16 >= MIN_COLUMN_HEIGHT) root.dataset.layout = "fit";
-      else delete root.dataset.layout;
-    };
-    check();
-    const ro = new ResizeObserver(check);
-    for (const el of [document.querySelector(".site-header"), layoutRef.current?.previousElementSibling]) if (el) ro.observe(el);
-    window.addEventListener("resize", check);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", check);
-      delete root.dataset.layout;
-    };
-  }, [incomplete]);
+  useFitLayout(layoutRef, { minWidth: 1100, minHeight: MIN_COLUMN_HEIGHT, enabled: !incomplete });
 
   return (
     <main id="main" className="container jobs-page" style={{ paddingBlock: "32px 48px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
@@ -237,9 +227,12 @@ export default function JobsPage() {
                 ))}
               </fieldset>
               <label className="ck" style={{ borderTop: "1px solid #e4e6eb", paddingTop: 14 }}>
-                <input type="checkbox" checked={statesAll} onChange={(e) => setStatesAll(e.target.checked)}
-                  data-voice-names="only jobs that state them|only stated|strict filter|only matching jobs" />
-                <span><strong>Only show jobs that state all my required accommodations</strong></span>
+                <input type="checkbox" checked={hideConflicts} onChange={(e) => setHideConflicts(e.target.checked)} />
+                <span><strong>{COPY.jobs.conflictFilter}</strong><span className="small muted" style={{ display: "block" }}>{COPY.jobs.conflictFilterHint}</span></span>
+              </label>
+              <label className="ck">
+                <input type="checkbox" checked={formOnly} onChange={(e) => setFormOnly(e.target.checked)} />
+                <span><strong>{COPY.jobs.formFilter}</strong><span className="small muted" style={{ display: "block" }}>{COPY.jobs.formFilterHint}</span></span>
               </label>
               <Link to="/profile#s3" style={{ fontWeight: 600 }} data-voice-names="edit my accommodations|change my accommodations">Edit in your profile</Link>
             </div>
@@ -265,7 +258,23 @@ export default function JobsPage() {
                 <button className="btn btn-secondary btn-sm" type="button" onClick={() => void doRun()}>{COPY.common.retry}</button>
               </div>
             )}
-            {data && !running && items.length === 0 && (
+            {data && !running && items.length === 0 && accFiltersOn && (
+              <div className="card" data-testid="filtered-empty">
+                <h3 style={{ margin: 0 }}>{COPY.jobs.filteredEmptyTitle}</h3>
+                <p style={{ margin: 0 }}>{COPY.jobs.filteredEmptyBody}</p>
+                <div className="row">
+                  <button className="btn btn-primary" type="button" onClick={() => { setHideConflicts(false); setFormOnly(false); announce("Accommodation filters turned off"); }}>
+                    {COPY.jobs.filteredEmptyOff}
+                  </button>
+                  {topUnfiltered && (
+                    <Link className="btn btn-secondary" to={`/jobs/${topUnfiltered.jobId}/email`}>
+                      Draft a request for {topUnfiltered.job.title} at {topUnfiltered.job.employerName}
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+            {data && !running && items.length === 0 && !accFiltersOn && (
               <div className="card">
                 <h3 style={{ margin: 0 }}>{COPY.jobs.noneTitle}</h3>
                 <ul style={{ margin: 0 }}>{COPY.jobs.noneSuggestions.map((s) => <li key={s}>{s}</li>)}</ul>
@@ -416,7 +425,20 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
         <Link className="btn btn-secondary" to={`/jobs/${jobId}/practice`} data-voice-names="practice interview|interview practice|mock interview|practice for this job|rehearse" data-voice-say="Here's the practice interview for this job. Say start when you're ready."><Icon name="mic" size={18} />{COPY.practice.entry}</Link>
       </div>
 
-      {job.accommodationForm && <EmployerFormCallout form={job.accommodationForm} employer={job.employer?.name ?? "This employer"} jobId={jobId} />}
+      {job.accommodationForm ? (
+        <EmployerFormCallout form={job.accommodationForm} employer={job.employer?.name ?? "This employer"} jobId={jobId} />
+      ) : job.accommodationContact && (
+        <div className="callout callout-info" data-testid="accepts-requests">
+          <Icon name="info" />
+          <div className="stack" style={{ gap: 8 }}>
+            <strong>{COPY.jobs.acceptsRequests}</strong>
+            <blockquote className="quote small">Listing says: "{job.accommodationContact.quote}"</blockquote>
+            <Link className="btn btn-primary btn-sm" to={`/jobs/${jobId}/email`} style={{ alignSelf: "flex-start" }}>
+              {job.accommodationContact.email ? `Draft a request to ${job.accommodationContact.email}` : "Draft a request"}
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="stack" style={{ gap: 10 }} ref={aboutRef} data-voice-names="about the role|job summary">
         <h3 style={{ margin: 0, fontSize: "1.12rem" }}>About the role</h3>

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalQuery, query } from "./_generated/server";
 import { requireUser } from "./lib/auth";
 import { fail } from "./lib/errors";
+import { findAccommodationContact } from "./lib/accommodationContact";
 
 export const get = query({
   args: { jobId: v.string() },
@@ -31,6 +32,8 @@ export const get = query({
       summary: job.summary,
       applyUrl: job.applyUrl,
       accommodationForm: job.accommodationForm ?? null,
+      // The listing's own accommodation statement and request address, if it gives one.
+      accommodationContact: findAccommodationContact(job.descriptionText),
       sourceUrl: job.sourceUrl,
       source: job.source,
       fetchedAt: job.fetchedAt,
