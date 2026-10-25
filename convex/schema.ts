@@ -31,9 +31,33 @@ export const vInterface = v.object({
   voiceNav: v.boolean(),
   reduceMotion: v.boolean(),
   contrast: v.union(v.literal("standard"), v.literal("high")),
+  // Voice control preferences (optional so existing profiles stay valid).
+  voiceGuidance: v.optional(v.union(v.literal("full"), v.literal("suggest"), v.literal("brief"))),
+  voicePatience: v.optional(v.union(v.literal("quick"), v.literal("balanced"), v.literal("patient"), v.literal("very_patient"))),
+  voiceOutput: v.optional(v.union(v.literal("speech"), v.literal("screen_reader"))),
+  voiceKey: v.optional(v.string()),
 });
 
 export const vAccommodationForm = v.object({ url: v.string(), quote: v.string() });
+
+// Email addresses the listing gives for accommodation requests, checked against the listing text.
+// "verified": the listing's own words tie the address to accommodation requests.
+// "unverified": the address sits near accommodation wording, but its purpose is not explicit.
+// PROVISIONAL: new field, pending review by Chris (docs/open-questions.md).
+export const vAccommodationEmail = v.object({
+  status: v.union(v.literal("verified"), v.literal("unverified"), v.literal("not_found"), v.literal("failed")),
+  emails: v.array(
+    v.object({
+      email: v.string(), // lowercased, as written in the listing (never guessed from a domain)
+      status: v.union(v.literal("verified"), v.literal("unverified")),
+      evidence: v.array(v.string()), // verbatim sentences from the listing text
+    }),
+  ),
+  source: v.literal("listing"),
+  method: v.string(), // detector name and version, e.g. "listing-rules-v1"
+  checkedAt: v.number(),
+  contentHash: v.string(), // the listing text this result was checked against
+});
 
 export const vRemotePreference = v.union(v.literal("remote"), v.literal("onsite"), v.literal("either"));
 export const vWorkplaceType = v.union(
@@ -142,6 +166,7 @@ export default defineSchema({
     sourceUrl: v.string(),
     sourceUpdatedAt: v.optional(v.number()),
     accommodationForm: v.optional(vAccommodationForm), // employer's own accommodation request form, from the listing
+    accommodationEmail: v.optional(vAccommodationEmail), // accommodation request addresses, from the listing
     fetchedAt: v.number(),
     status: v.union(v.literal("open"), v.literal("closed")),
     closedAt: v.optional(v.number()),

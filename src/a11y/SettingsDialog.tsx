@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { usePrefs } from "./prefs";
 import { Icon } from "../components/Icon";
+import { useVoiceActions } from "../voice/intent/actions";
+import { setVoiceSettings, useVoiceSettings, type Guidance } from "../voice/agent/settings";
 import type { InterfacePrefs } from "../../shared/types";
 import {
   comboConflict, comboFromEvent, comboProblem, DEFAULT_VOICE_KEY, formatCombo, isModifierCode, setCapturing, setVoiceKey, useVoiceKey,
@@ -36,6 +38,15 @@ export function SettingsDialog() {
     }
   }, [settingsOpen]);
 
+  // Voice, from any page: change the text size without opening the settings.
+  const step = (dir: 1 | -1) => update({ textScale: Math.round(Math.min(2, Math.max(1, prefs.textScale + dir * 0.1)) * 10) / 10 });
+  useVoiceActions([
+    { names: ["Make the text bigger", "bigger text", "larger text", "increase the text size", "zoom in"], run: () => step(1),
+      message: () => `Text size ${Math.round(Math.min(2, prefs.textScale + 0.1) * 100)}%.`, when: () => prefs.textScale < 2 },
+    { names: ["Make the text smaller", "smaller text", "decrease the text size", "zoom out"], run: () => step(-1),
+      message: () => `Text size ${Math.round(Math.max(1, prefs.textScale - 0.1) * 100)}%.`, when: () => prefs.textScale > 1 },
+  ]);
+
   const onClose = () => {
     closeSettings();
     (opener.current as HTMLElement | null)?.focus?.();
@@ -65,7 +76,7 @@ export function SettingsDialog() {
   };
 
   return (
-    <dialog ref={ref} className="slide-over" aria-labelledby={titleId} onClose={onClose} onCancel={onClose}>
+    <dialog ref={ref} className="slide-over" aria-labelledby={titleId} data-voice-opener="open-settings" onClose={onClose} onCancel={onClose}>
       <div style={{ display: "flex", flexDirection: "column", minHeight: "100%" }}>
         <div className="row" style={{ justifyContent: "space-between", padding: "20px 24px", borderBottom: "1px solid var(--line)" }}>
           <h2 id={titleId} style={{ margin: 0, fontSize: "1.3rem" }}>Accessibility settings</h2>
@@ -118,9 +129,10 @@ export function SettingsDialog() {
           </fieldset>
 
           <VoiceShortcutSettings />
+          <VoiceAssistantSettings />
         </div>
         <div className="row" style={{ justifyContent: "space-between", padding: "16px 24px", borderTop: "1px solid var(--line)" }}>
-          <button className="btn btn-secondary" type="button" onClick={reset}>Reset to default</button>
+          <button className="btn btn-secondary" type="button" onClick={reset} data-voice-names="reset settings|reset to defaults">Reset to default</button>
           <button className="btn btn-primary" type="button" onClick={onClose}>Done</button>
         </div>
       </div>
@@ -218,6 +230,39 @@ function VoiceShortcutSettings() {
           Reset shortcut to {formatCombo(DEFAULT_VOICE_KEY.combo)}, hold
         </button>
       </div>
+    </fieldset>
+  );
+}
+
+// The voice assistant: whether it speaks, how much it says, and (for development) whether it is
+// used at all. Saved on this device.
+const GUIDANCE: [Guidance, string, string][] = [
+  ["brief", "Short confirmations", "\"Saved.\""],
+  ["suggest", "Confirmations and a suggestion", "\"Saved. Want to request accommodations?\""],
+  ["full", "Full orientation", "Where you are, what is selected and what you can do next. For when you cannot see the page."],
+];
+
+function VoiceAssistantSettings() {
+  const v = useVoiceSettings();
+  return (
+    <fieldset style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }} data-voice-names="voice assistant|assistant settings">
+      <legend style={{ paddingTop: 8 }}>Voice assistant</legend>
+      <Toggle label="Speak replies aloud" checked={v.speak} onChange={(speak) => setVoiceSettings({ speak })} />
+      <fieldset>
+        <legend className="label">How much the assistant says</legend>
+        <div className="stack" style={{ gap: 8 }}>
+          {GUIDANCE.map(([g, label, hint]) => (
+            <label key={g} className="check" style={{ alignItems: "flex-start", padding: "8px 14px" }}>
+              <input type="radio" name="voice-guidance" checked={v.guidance === g} onChange={() => setVoiceSettings({ guidance: g })} />
+              <span>
+                {label}
+                <span className="small muted" style={{ display: "block" }}>{hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <Toggle label="Developer: use the AI assistant (off: keyword matching only)" checked={v.agent} onChange={(agent) => setVoiceSettings({ agent })} />
     </fieldset>
   );
 }

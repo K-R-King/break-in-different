@@ -44,7 +44,7 @@ export default function TrackerPage() {
         </div>
         <div className="row" style={{ gap: 8 }}>
           <label htmlFor="sort" className="label">Sort by</label>
-          <select id="sort" className="input" style={{ width: "auto", minHeight: 44 }} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+          <select id="sort" className="input" style={{ width: "auto", minHeight: 44 }} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} data-voice-names="sort|order">
             <option value="deadline">Deadline (soonest first)</option>
             <option value="updated">Last update</option>
           </select>
@@ -123,7 +123,7 @@ function TrackerRow({ row, onStatus }: { row: Row; onStatus: (s: string) => void
   };
 
   return (
-    <tr>
+    <tr data-voice-names={[title, row.job?.employerName && `${title} at ${row.job.employerName}`, row.job?.employerName].filter(Boolean).join("|")}>
       <td style={td}>
         <strong>{title}</strong><br />{row.job?.employerName} {row.job?.isDemo && <span className="demo">DEMO</span>}
         {row.job?.status === "closed" && <><br /><span className="small muted">Listing closed</span></>}
@@ -135,19 +135,19 @@ function TrackerRow({ row, onStatus }: { row: Row; onStatus: (s: string) => void
         </span>
         <br />
         <label htmlFor={`st-${row._id}`} className="sr-only">Status for {title}</label>
-        <select id={`st-${row._id}`} className="input" style={{ width: "auto", minHeight: 44, fontSize: "0.88rem", fontWeight: 600 }} value={row.status}
+        <select id={`st-${row._id}`} className="input" style={{ width: "auto", minHeight: 44, fontSize: "0.88rem", fontWeight: 600 }} value={row.status} data-voice-names="status|application status"
           onChange={(e) => void save({ status: e.target.value as ApplicationStatus }, `${title}: status changed to ${STATUS_LABELS[e.target.value as ApplicationStatus]}. Saved.`)}>
           {APPLICATION_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
       </td>
       <td style={td}>
         <label htmlFor={`dl-${row._id}`} className="sr-only">Deadline for {title}</label>
-        <input id={`dl-${row._id}`} type="date" className="input" style={{ minHeight: 44, width: "auto" }} defaultValue={row.deadline ?? ""}
+        <input id={`dl-${row._id}`} type="date" className="input" style={{ minHeight: 44, width: "auto" }} defaultValue={row.deadline ?? ""} data-voice-names="deadline|due date"
           onBlur={(e) => { if ((e.target.value || null) !== row.deadline) void save({ deadline: e.target.value || null }, `${title}: deadline saved.`); }} />
       </td>
       <td style={td}>
         <label htmlFor={`fu-${row._id}`} className="sr-only">Follow-up date for {title}</label>
-        <input id={`fu-${row._id}`} type="date" className="input" style={{ minHeight: 44, width: "auto" }} defaultValue={row.followUpDate ?? ""}
+        <input id={`fu-${row._id}`} type="date" className="input" style={{ minHeight: 44, width: "auto" }} defaultValue={row.followUpDate ?? ""} data-voice-names="follow up|follow-up|reminder date"
           onBlur={(e) => { if ((e.target.value || null) !== row.followUpDate) void save({ followUpDate: e.target.value || null }, `${title}: follow-up date saved.`); }} />
       </td>
       <td style={td}>
@@ -158,7 +158,7 @@ function TrackerRow({ row, onStatus }: { row: Row; onStatus: (s: string) => void
               <strong>{new Date(iv.date).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong>
               {iv.notes && <><br />{iv.notes}</>}
               <br />
-              <button type="button" className="btn-link small" onClick={() => void save({ interviews: row.interviews.filter((_, j) => j !== i) }, `${title}: interview removed.`)}>Remove<span className="sr-only"> interview</span></button>
+              <button type="button" className="btn-link small" onClick={() => void save({ interviews: row.interviews.filter((_, j) => j !== i) }, `${title}: interview removed.`)} data-voice-names="delete the interview|remove the interview">Remove<span className="sr-only"> interview</span></button>
             </li>
           ))}
         </ul>
@@ -169,31 +169,31 @@ function TrackerRow({ row, onStatus }: { row: Row; onStatus: (s: string) => void
             void save({ interviews: [...row.interviews, { date: new Date(ivDate).toISOString(), notes: ivNotes.trim() }] }, `${title}: interview added.`).then(() => { setAdding(false); setIvDate(""); setIvNotes(""); });
           }}>
             <label className="small label" htmlFor={`ivd-${row._id}`}>Date and time</label>
-            <input id={`ivd-${row._id}`} type="datetime-local" className="input" style={{ minHeight: 44 }} value={ivDate} onChange={(e) => setIvDate(e.target.value)} />
+            <input id={`ivd-${row._id}`} type="datetime-local" className="input" style={{ minHeight: 44 }} value={ivDate} onChange={(e) => setIvDate(e.target.value)} data-voice-names="interview date|interview time|when" />
             <label className="small label" htmlFor={`ivn-${row._id}`}>Notes</label>
-            <input id={`ivn-${row._id}`} className="input" style={{ minHeight: 44 }} value={ivNotes} onChange={(e) => setIvNotes(e.target.value)} />
+            <input id={`ivn-${row._id}`} className="input" style={{ minHeight: 44 }} value={ivNotes} onChange={(e) => setIvNotes(e.target.value)} data-voice-names="interview notes" />
             <span className="row" style={{ gap: 6 }}>
-              <button className="btn btn-secondary btn-sm" type="submit">Add</button>
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setAdding(false)}>Cancel</button>
+              <button className="btn btn-secondary btn-sm" type="submit" data-voice-names="save the interview|add it">Add</button>
+              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setAdding(false)} data-voice-command data-voice-names="cancel|never mind">Cancel</button>
             </span>
           </form>
         ) : (
-          <><br /><button type="button" className="btn-link" onClick={() => setAdding(true)}>Add interview<span className="sr-only"> for {title}</span></button></>
+          <><br /><button type="button" className="btn-link" onClick={() => setAdding(true)} data-voice-command data-voice-names="add an interview|new interview|schedule an interview">Add interview<span className="sr-only"> for {title}</span></button></>
         )}
       </td>
       <td style={td}>
         {row.draft ? (
           <>
-            <Link to={`/jobs/${row.jobId}/email`}>{row.draft.approvedAt ? "Approved draft" : "Draft (not approved)"}<span className="sr-only"> for {title}</span></Link>
+            <Link to={`/jobs/${row.jobId}/email`} data-voice-names="the draft|email draft|open the draft|my email">{row.draft.approvedAt ? "Approved draft" : "Draft (not approved)"}<span className="sr-only"> for {title}</span></Link>
             <br /><span className="small muted">{new Date(row.draft.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
           </>
         ) : (
-          <><span className="muted">No draft yet</span><br /><Link to={`/jobs/${row.jobId}/email`}>Start a draft<span className="sr-only"> for {title}</span></Link></>
+          <><span className="muted">No draft yet</span><br /><Link to={`/jobs/${row.jobId}/email`} data-voice-names="write an email|start the email|draft an email|request accommodations">Start a draft<span className="sr-only"> for {title}</span></Link></>
         )}
       </td>
       <td style={td}>
         <label htmlFor={`nt-${row._id}`} className="sr-only">Notes for {title}</label>
-        <textarea id={`nt-${row._id}`} className="input" rows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} style={{ minWidth: 180 }}
+        <textarea id={`nt-${row._id}`} className="input" rows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} style={{ minWidth: 180 }} data-voice-names="notes|my notes"
           onBlur={() => { if (notes !== row.notes) void save({ notes }, `${title}: notes saved.`); }} />
       </td>
       <td style={td}>

@@ -6,25 +6,93 @@ An inclusive career platform that helps job seekers with diverse accessibility n
 
 What it never does: send anything for you, auto-apply, ask for a diagnosis, or say an employer lacks an accommodation. If a listing says nothing, the app says "Not mentioned in this listing. This does not mean it is unavailable."
 
-## Run with Docker Compose (recommended for demos)
+## Run the demo (no Docker, fastest)
 
-Prerequisites: Docker Desktop, `openssl`, `curl`.
+### Environment requirements (no-Docker deployment)
+
+| Requirement | Version | Used for |
+|---|---|---|
+| OS | macOS (Apple silicon or Intel) or Linux (x86_64 or arm64, glibc) | the prebuilt Convex backend binary; on Windows use WSL, or the Docker version |
+| Node.js with npm | 22.12 or newer (Vite's minimum); an LTS line, 22 or 24, is safest | web build, Convex CLI, deploy step, static servers, tests. `demo.sh` stops if Node is older |
+| Python | 3.11 or newer; 3.11 recommended | the matching agent (optional: without it matching uses its fallback). `demo.sh` picks `python3.11`, `3.12`, `3.13` or `python3`, if 3.11+ |
+| `bash`, `curl`, `unzip`, `openssl` | any recent (macOS's bash 3.2 works) | the script, downloads, generated secrets |
+| Free ports on 127.0.0.1 | 3210, 3211, 6791, 8080, 8000 | Convex API, Convex HTTP actions and `/health`, dashboard, app, agent (the agent listens on all interfaces). Stop the Docker version first |
+| Disk | about 700 MB | Convex backend 167 MB, dashboard 26 MB, `node_modules` 333 MB, `agent/.venv` 141 MB, seeded database about 17 MB |
+| Network, first run only | github.com, registry.npmjs.org, pypi.org | backend and dashboard (63 MB download), npm packages (skipped when `node_modules` matches `package-lock.json`), agent packages. Afterwards only the sponsor APIs, when their keys are set |
+| Browser | current Chrome | the demo; tests use Playwright's Chromium (`npx playwright install chromium`) |
+
+Packages are pinned: `package-lock.json` for npm (`npm ci`), and `requirements.txt` for the agent's Python packages (exact versions, tested on Python 3.11). `agent/requirements.txt` keeps the version ranges the Docker image installs; `agent/requirements-dev.txt` adds pytest.
+
+Environment variables: none are required. `.env` holds the optional sponsor keys (created from `.env.example` on the first run; see "Environment files"), `.demo-local/env` holds the generated secrets, and `CONVEX_BACKEND_VERSION` optionally overrides the pinned backend build.
+
+Tested on 2026-10-24: macOS on Apple silicon, Node 26.12.1, Python 3.11.15.
+
+### Start it
 
 ```sh
-./scripts/demo.sh init     # creates .env.docker (generated secrets) and .env (from .env.example)
-# put your API keys in .env (see "Environment files" below)
-./scripts/demo.sh up       # starts Convex, deploys functions, pushes keys, seeds data, starts web + agent
+./scripts/demo.sh up       # downloads what is missing, starts Convex, deploys functions, pushes keys, seeds data, starts web + agent
+# put your API keys in .env (created on the first run; see "Environment files"), then:
+./scripts/demo.sh keys     # re-pushes .env to Convex
 npm run check:integrations # optional: confirms Claude, Cartesia and Apify work with your keys
 ```
 
 - App: http://localhost:8080
 - Demo login: `sam@example.com` / `break-in-different` (created by the seed with an empty profile: fill in Profile before finding jobs; `reset` recreates it)
-- Convex dashboard: http://localhost:6791 (log in with `./scripts/demo.sh admin-key`)
+- Convex dashboard: http://localhost:6791 (signed in automatically; the admin key is `./scripts/demo.sh admin-key`)
 - Health: http://127.0.0.1:3211/health
 
-`./scripts/demo.sh keys` re-pushes `.env` to Convex after you edit it. `reset` wipes the database and reseeds (demo reset). `down` stops everything, `logs` follows logs.
+`reset` wipes the database and reseeds (demo reset). `down` stops everything, `stop-agent` stops only the agent (fallback rehearsal), `logs` follows logs.
+
+What it runs, all on 127.0.0.1 and on the same ports as the Docker version:
+
+- the open-source Convex backend binary, pinned to the build the Docker image uses (`precompiled-2026-10-23-65a9491`; override with `CONVEX_BACKEND_VERSION`), downloaded once from the `convex/convex-backend` GitHub releases (56 MB);
+- the Convex dashboard from the same release (7 MB), served by `scripts/serve-static.mjs`;
+- the built web app, served by the same script with the security headers from `docker/nginx.conf`;
+- the matching agent in `agent/.venv`, installed from `requirements.txt` in the background on the first run.
+
+State lives in `.demo-local/` (gitignored): generated secrets, the database, pid files and logs. Only the deploy step reads `.env`; the backend, web server and agent never see the sponsor keys.
 
 Everything works without any API key: each sponsor integration has a fallback (see below).
+
+## Run with Docker Compose
+
+Prerequisites: Docker Desktop (or OrbStack), `openssl`, `curl`. Uses the ports above, so stop the other version first.
+
+```sh
+./scripts/demo-docker.sh init  # creates .env.docker (generated secrets) and .env (from .env.example)
+./scripts/demo-docker.sh up    # same steps as demo.sh up, in containers
+```
+
+`keys`, `reset`, `down`, `logs` and `admin-key` work as above. `npm run demo:docker` is the same as `up`.
+
+### Startup time and optimization plan
+
+Measured on 2026-10-24 (Apple silicon, OrbStack):
+
+| Phase | Time | Notes |
+|---|---|---|
+| `demo.sh up`, first run | 90 s | 76 s of it downloading the backend and dashboard from GitHub (network-bound, once) |
+| `demo.sh up` or `reset`, downloads cached | 10 s | |
+| Pull `convex-backend` + `convex-dashboard` (Docker) | download-bound | 798 MB + 688 MB unpacked; the largest cost on a fresh machine |
+| Build `web`, `deploy`, `agent` with no cache (Docker) | 48 s (parallel) | agent `pip install` 44 s, `npm ci` 33 s, `vite build` about 8 s |
+| `deploy` step (push functions, env vars, seed) | about 5 s | same script in both versions |
+| `demo-docker.sh up` with everything cached | 12 s | |
+| Claude extraction of the 369 listings after a reset | about 5 min | matching only sees listings that are already extracted |
+
+The `deploy` image is 847 MB because it installs all 358 MB of `node_modules`, including the test and lint tools. The agent's `pip install` builds nothing from source; the time goes to resolving versions, because `agent/requirements.txt` only sets lower bounds.
+
+Planned, most useful first (not done yet; the no-Docker script already avoids the image pulls and builds):
+
+1. **Pre-extracted seed** (Chris + Mark): store each listing's extraction results in `convex/seedData/snapshot.json` and load them at seed time, so a reset shows real matches in seconds, even without a Claude key.
+2. **Pin the Convex images** (Chris): replace `:latest` with digests in `docker-compose.yml`, as `demo.sh` already pins its backend version, so a new Convex release cannot change the demo. Current digests: backend `sha256:df3e32d53c43…`, dashboard `sha256:64f69f6f5620…`.
+3. **Pull and build in parallel** (Chris): `demo-docker.sh up` currently starts the backend, then builds `deploy`, then builds `web` and `agent`. Run `docker compose pull` and `docker compose --profile tools build` together first, so the builds overlap the download.
+4. **Slim the `deploy` image** (Chris): `npm ci --omit=dev`. This needs `scripts/generate-keys.mjs` to use Node's built-in `crypto` instead of `jose`, which is a dev dependency.
+5. **npm cache mount** (Chris): `RUN --mount=type=cache,target=/root/.npm npm ci` in both Node Dockerfiles; it speeds up rebuilds after a dependency change.
+6. **Lock the agent's Python dependencies** (Mark): `demo.sh` already installs the exact versions in `requirements.txt`; the agent's Dockerfile could install the same file to cut most of its 44 s.
+
+The Convex dashboard stays in the default stack: it is the quickest way to inspect tables and functions.
+
+To time a cold build, use `docker compose --env-file .env.docker --profile tools build --no-cache`. On OrbStack's containerd image store, `docker builder prune` and `docker system df` do not show or clear every cached layer.
 
 ## Environment files
 
@@ -32,8 +100,9 @@ All real env files are gitignored; only the `*.example` templates (names, no val
 
 | File | Holds | Created by | Read by |
 |---|---|---|---|
-| `.env` | Sponsor API keys: `ANTHROPIC_API_KEY`, `CLAUDE_MODEL_EXTRACT`, `CLAUDE_MODEL_WRITE`, `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`, `APIFY_TOKEN`, `MOCK_AI`, `SCHEDULED_INGEST` (1 turns on the daily scrape; off by default for demos) | you (`cp .env.example .env`, or `demo.sh init`) | the one-shot `deploy` container, which pushes them into the Convex server environment |
-| `.env.docker` | Generated infrastructure secrets: `CONVEX_INSTANCE_SECRET`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `AGENT_SHARED_SECRET` | `demo.sh init` / `up` | Docker Compose, the agent |
+| `.env` | Sponsor API keys: `ANTHROPIC_API_KEY`, `CLAUDE_MODEL_EXTRACT`, `CLAUDE_MODEL_WRITE`, `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`, `APIFY_TOKEN`, `MOCK_AI`, `SCHEDULED_INGEST` (1 turns on the daily scrape; off by default for demos) | you (`cp .env.example .env`, or the first `demo.sh up` / `demo-docker.sh init`) | the deploy step (`scripts/deploy.sh`, in the `deploy` container for Docker), which pushes them into the Convex server environment |
+| `.demo-local/env` | Generated infrastructure secrets for the no-Docker demo: `CONVEX_INSTANCE_SECRET`, `AGENT_SHARED_SECRET`, `CONVEX_SELF_HOSTED_ADMIN_KEY` | `demo.sh up` | `demo.sh` (backend, agent, deploy step) |
+| `.env.docker` | The same secrets for the Docker demo | `demo-docker.sh init` / `up` | Docker Compose, the agent |
 | `.env.local` | `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `VITE_CONVEX_URL` (public URL only) | you (`.env.local.example`) | `npx convex` CLI, Vite |
 | `agent/.env` | `CONVEX_SITE_URL`, `AGENT_SHARED_SECRET` (only when running the agent outside Docker) | you (`agent/.env.example`) | the agent |
 
@@ -43,7 +112,7 @@ API keys live only in the Convex server environment; the browser bundle, the age
 
 ```sh
 npm install
-./scripts/demo.sh up                      # or just: docker compose --env-file .env.docker up -d backend dashboard
+./scripts/demo.sh up                      # or ./scripts/demo-docker.sh up
 cp .env.local.example .env.local          # set CONVEX_SELF_HOSTED_ADMIN_KEY (./scripts/demo.sh admin-key)
 npx convex dev                            # pushes convex/ on every save
 npm run dev                               # Vite on http://localhost:5173
@@ -58,7 +127,7 @@ Server-side keys come from `.env` via `./scripts/demo.sh keys` (or `npx convex e
 | `npm run test:agent` | pytest: the Python scorer against the same shared fixtures as the TypeScript scorer |
 | `npm run e2e` | Playwright journeys (A1, A3–A5, A8–A15) against a running stack (`E2E_BASE_URL`, default :5173) |
 | `npm run test:a11y` | axe on all six routes in three modes (default, OpenDyslexic at 200%, high contrast) |
-| `npm run test:integration` | Ownership, unauthenticated access and the "no disability data in agent payloads" spy test (stop the agent container first; needs `AGENT_SHARED_SECRET`) |
+| `npm run test:integration` | Ownership, unauthenticated access and the "no disability data in agent payloads" spy test (stop the agent first with `./scripts/demo.sh stop-agent`; needs `AGENT_SHARED_SECRET`) |
 | `npm run build` | Typecheck, Vite build, then fail if any secret value appears in `dist/` |
 | `npm run check:integrations` | Spikes S2–S7 with the real keys: Claude extraction, conflict, PDF→skills, explanation, email drafts; Cartesia TTS timestamps and STT round trip; Apify Actor run and field names |
 | `npm run seed` / `npm run ingest` | Load DEMO + snapshot listings and the demo login / run a live ingest |

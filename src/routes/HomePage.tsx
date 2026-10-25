@@ -25,7 +25,7 @@ export function HomePage() {
             ) : (
               <Link className="btn btn-primary btn-lg" to="/account?tab=signup">{c.ctaPrimary}</Link>
             )}
-            <button className="btn btn-secondary btn-lg" type="button" onClick={openSettings}>{c.ctaSettings}</button>
+            <button className="btn btn-secondary btn-lg" type="button" onClick={openSettings} data-voice-names="adjust text|reading settings|text and reading">{c.ctaSettings}</button>
           </div>
           <p className="muted" style={{ margin: 0 }}>{c.noAccount}</p>
         </div>

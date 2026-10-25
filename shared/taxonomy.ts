@@ -160,4 +160,5 @@ export const LIMITS = {
   resumeUploadsPerDay: 10,
   ttsCallsPerHour: 30,
   sttCallsPerHour: 120,
+  voiceTokensPerHour: 240, // Cartesia access tokens for live speech-to-text (each lasts 60 s)
 } as const;

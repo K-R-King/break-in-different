@@ -68,6 +68,32 @@ export async function structuredCall<T>(opts: {
   }
 }
 
+// Streamed plain text for the voice assistant, where time to the first words is what matters:
+// the fast model, low effort, no thinking. Yields text as it arrives; throws on failure so the
+// caller can end its stream (the browser falls back to keyword matching).
+export async function* streamText(opts: {
+  system: string;
+  messages: Anthropic.MessageParam[];
+  schema?: Record<string, unknown>; // constrain the reply to this JSON schema
+  maxTokens?: number;
+  signal?: AbortSignal;
+}): AsyncGenerator<string> {
+  const stream = getClient().messages.stream(
+    {
+      model: process.env.CLAUDE_MODEL_VOICE || process.env.CLAUDE_MODEL_EXTRACT || "claude-haiku-5-5",
+      max_tokens: opts.maxTokens ?? 600,
+      thinking: { type: "disabled" },
+      output_config: opts.schema ? { effort: "low", format: { type: "json_schema", schema: opts.schema } } : { effort: "low" },
+      system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
+      messages: opts.messages,
+    },
+    { signal: opts.signal, timeout: 15_000, maxRetries: 1 },
+  );
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") yield event.delta.text;
+  }
+}
+
 // Untrusted text goes inside delimiters with an instruction to treat it as data.
 export function asData(label: string, text: string): string {
   const fence = `<<<${label}_${Math.random().toString(36).slice(2, 10)}>>>`;

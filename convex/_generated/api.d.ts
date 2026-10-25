@@ -14,6 +14,8 @@ import type * as ai_practice from "../ai/practice.js";
 import type * as ai_prompts from "../ai/prompts.js";
 import type * as ai_templates from "../ai/templates.js";
 import type * as ai_validators from "../ai/validators.js";
+import type * as ai_voiceAgent from "../ai/voiceAgent.js";
+import type * as ai_voiceAgentHttp from "../ai/voiceAgentHttp.js";
 import type * as applications from "../applications.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
@@ -39,6 +41,7 @@ import type * as seed from "../seed.js";
 import type * as spikes from "../spikes.js";
 import type * as stt from "../stt.js";
 import type * as tts from "../tts.js";
+import type * as voice from "../voice.js";
 
 import type {
   ApiFromModules,
@@ -53,6 +56,8 @@ declare const fullApi: ApiFromModules<{
   "ai/prompts": typeof ai_prompts;
   "ai/templates": typeof ai_templates;
   "ai/validators": typeof ai_validators;
+  "ai/voiceAgent": typeof ai_voiceAgent;
+  "ai/voiceAgentHttp": typeof ai_voiceAgentHttp;
   applications: typeof applications;
   auth: typeof auth;
   crons: typeof crons;
@@ -78,6 +83,7 @@ declare const fullApi: ApiFromModules<{
   spikes: typeof spikes;
   stt: typeof stt;
   tts: typeof tts;
+  voice: typeof voice;
 }>;
 
 /**

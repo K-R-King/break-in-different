@@ -1,5 +1,5 @@
 # Break In Different — whole demo environment.
-# Quick start: ./scripts/demo.sh up   (see README "Run with Docker Compose")
+# Quick start: ./scripts/demo-docker.sh up   (see README "Run with Docker Compose"; ./scripts/demo.sh runs the same stack without Docker)
 services:
   backend:
     image: ghcr.io/convex/convex-backend:latest
@@ -14,7 +14,7 @@ services:
       - CONVEX_CLOUD_ORIGIN=http://127.0.0.1:3210
       - CONVEX_SITE_ORIGIN=http://127.0.0.1:3211
       - INSTANCE_NAME=break-in-different
-      - INSTANCE_SECRET=${CONVEX_INSTANCE_SECRET:?run ./scripts/demo.sh init first}
+      - INSTANCE_SECRET=${CONVEX_INSTANCE_SECRET:?run ./scripts/demo-docker.sh init first}
       - DISABLE_BEACON=true
       - DOCUMENT_RETENTION_DELAY=172800
       - RUST_LOG=info
