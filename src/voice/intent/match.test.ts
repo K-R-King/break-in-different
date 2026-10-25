@@ -178,6 +178,22 @@ describe("looseGuess", () => {
   });
 });
 
+describe("simple: only the control's own name, so it is done locally", () => {
+  const c: Candidate[] = [
+    { id: 1, kind: "group", names: ["Remote work options"] },
+    { id: 2, kind: "radio", names: ["Not needed"], parent: 1 },
+    { id: 3, kind: "button", names: ["Refresh matches"] },
+  ];
+  it("a name, maybe with a verb, is simple", () => {
+    expect(bestMatch("refresh the matches", c)?.simple).toBe(true);
+    expect(m("turn on reduce motion")?.simple).toBe(true);
+    expect(m("go to my profile")?.simple).toBe(true);
+  });
+  it("anything said in context is not, so the assistant interprets it", () => {
+    expect(bestMatch("Remote work options should be Not needed", c)).toMatchObject({ id: 2, simple: false });
+  });
+});
+
 describe("action words in a control's name", () => {
   const c: Candidate[] = [
     { id: 1, kind: "button", names: ["Refresh matches"] },

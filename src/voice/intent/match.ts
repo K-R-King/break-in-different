@@ -23,6 +23,7 @@ export interface Match {
   verb: Verb | null;
   score: number;
   confident: boolean; // safe to act on: most of what was said is explained, clear winner
+  simple: boolean; // nothing but the control's own name (and a verb): trivial enough to act on locally
   ambiguousWith?: number;
 }
 
@@ -387,6 +388,9 @@ export function bestMatch(text: string, candidates: Candidate[], opts: MatchOpti
     verb: leads ? (top.c.kind === "link" ? "go" : "press") : verb,
     score: top.score,
     confident: !rival && share > 0.5, // more than half: "stop reading" is not "Reading and voice"
+    // Every word is the control's own name. Anything more ("Remote work options should be Not
+    // needed", "show remote jobs") is said in context and needs understanding.
+    simple: words.every((w) => hitsOf(top.c).used.has(w)),
     ambiguousWith: rival?.c.id,
   };
 }
