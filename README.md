@@ -6,6 +6,14 @@ An inclusive career platform that helps job seekers with diverse accessibility n
 
 What it never does: send anything for you, auto-apply, ask for a diagnosis, or say an employer lacks an accommodation. If a listing says nothing, the app says "Not mentioned in this listing. This does not mean it is unavailable."
 
+## How we use Convex
+
+- A self-hosted Convex backend holds the data, auth (Convex Auth) and every API key; the browser talks only to Convex.
+- Jobs, Tracker, Email and Profile read through `useQuery`, so match results and status changes appear without a refresh.
+- HTTP actions connect the Python MatchAgent and the voice assistant; actions call Claude and Cartesia.
+- Crons, scheduled functions and file storage run ingest, Claude extraction, resume upload and interview audio.
+- Evidence, files and a dated commit log: [hackathon.md](hackathon.md).
+
 ## Run the demo (no Docker, fastest)
 
 ### Environment requirements (no-Docker deployment)
