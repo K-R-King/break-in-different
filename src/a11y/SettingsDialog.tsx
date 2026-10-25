@@ -65,7 +65,7 @@ export function SettingsDialog() {
   };
 
   return (
-    <dialog ref={ref} className="slide-over" aria-labelledby={titleId} onClose={onClose} onCancel={onClose}>
+    <dialog ref={ref} className="slide-over" aria-labelledby={titleId} data-voice-opener="open-settings" onClose={onClose} onCancel={onClose}>
       <div style={{ display: "flex", flexDirection: "column", minHeight: "100%" }}>
         <div className="row" style={{ justifyContent: "space-between", padding: "20px 24px", borderBottom: "1px solid var(--line)" }}>
           <h2 id={titleId} style={{ margin: 0, fontSize: "1.3rem" }}>Accessibility settings</h2>

@@ -302,6 +302,7 @@ function JobCard({ it, selected, onSelect, onToggleSave, onRead }: { it: Item; s
   return (
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- mouse shortcut; the title link is the keyboard path
     <article id={`job-${it.jobId}`} tabIndex={-1} aria-labelledby={`jt-${it.jobId}`} aria-current={selected ? "true" : undefined} onClick={onCardClick}
+      data-voice-names={[`${it.job.title} at ${it.job.employerName}`, it.job.location && `${it.job.title} in ${it.job.location}`, it.job.employerName].filter(Boolean).join("|")}
       className="stack job-card" style={{ background: "var(--surface)", border: selected ? "3px solid var(--ink)" : "1px solid var(--line)", borderRadius: 18, padding: selected ? 18 : 20, gap: 12 }}>
       <div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap", gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -379,7 +380,8 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
   const readText = full || prefs.voiceReader ? job.descriptionText : summary;
 
   return (
-    <section id="detail" aria-labelledby="detail-heading" className="jobs-col detail panel stack" style={{ padding: 26, gap: 18 }}>
+    <section id="detail" aria-labelledby="detail-heading" className="jobs-col detail panel stack" style={{ padding: 26, gap: 18 }}
+      data-voice-names={`${job.title} at ${job.employer?.name ?? ""}|job details`}>
       <div className="stack" style={{ gap: 6 }}>
         {job.isDemo && <div className="row small muted" style={{ gap: 8 }}><span className="demo">DEMO</span>{COPY.common.demoNote}</div>}
         <h2 id="detail-heading" tabIndex={-1} style={{ margin: 0, fontSize: "1.65rem", lineHeight: 1.2 }}>{job.title}</h2>

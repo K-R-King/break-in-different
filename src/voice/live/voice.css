@@ -1,0 +1,80 @@
+/* Voice control: green while active. Green is never the only cue (the label changes too). */
+:root {
+  --voice: #15803d; /* 5.0:1 on white */
+  --voice-strong: #166534;
+  --voice-bg: #ecfdf3;
+  --voice-glow: rgba(21, 128, 61, 0.45);
+}
+html[data-contrast="high"] {
+  --voice: #0b4d24;
+  --voice-strong: #063a1a;
+  --voice-bg: #ffffff;
+  --voice-glow: rgba(11, 77, 36, 0.6);
+}
+
+.voice-wrap { position: relative; display: inline-flex; flex-direction: column; }
+/* Always on screen: the button lives in a top-layer dock placed over .voice-slot in the header,
+   or docked at the top of the window (see VoiceButton). */
+.voice-slot { display: inline-block; }
+.voice-dock[popover] { position: fixed; inset: auto; margin: 0; padding: 0; border: 0; background: transparent; overflow: visible; color: inherit; }
+.voice-dock[popover]:not(:popover-open) { display: none; }
+.voice-dock[data-docked="true"] .voice-btn { box-shadow: 0 6px 22px rgba(20, 21, 26, 0.22); }
+.voice-btn { position: relative; transition: border-color 600ms ease-out, background-color 600ms ease-out, color 600ms ease-out; }
+/* Starting or reconnecting: green outline, no glow (nothing is being heard yet). */
+.voice-btn[aria-pressed="true"] { border-color: var(--voice); color: var(--voice-strong); background: var(--voice-bg); }
+.voice-btn[aria-pressed="true"]:not([data-heard="true"]) { border-style: dashed; }
+
+/* The glow lives on its own layer so it can fade out (glow down) when listening ends. */
+.voice-btn::after {
+  content: ""; position: absolute; inset: -2px; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 3px var(--voice-glow), 0 0 18px 6px var(--voice-glow);
+  opacity: 0; transition: opacity 900ms ease-out;
+}
+.voice-btn[data-heard="true"]::after { opacity: 1; transition-duration: 250ms; animation: voice-glow 1.6s ease-in-out infinite; }
+@keyframes voice-glow {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.04); filter: brightness(1.15); }
+}
+html[data-reduce-motion="true"] .voice-btn::after { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { .voice-btn::after { animation: none; transition: none; } }
+
+.voice-panel {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 30;
+  margin: 0; color: inherit;
+  width: min(360px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  background: var(--surface); border: 2px solid var(--voice); border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(20, 21, 26, 0.18);
+}
+/* In the top layer (popover): fixed under the button, placed by VoiceButton. */
+.voice-panel[popover] { position: fixed; inset: auto; overflow: visible; }
+.voice-panel[popover]:not(:popover-open) { display: none; }
+.voice-panel[data-fading="true"] { animation: voice-fade 12s ease-in forwards; }
+@keyframes voice-fade { 0%, 88% { opacity: 1; } 100% { opacity: 0; } }
+html[data-reduce-motion="true"] .voice-panel[data-fading="true"] { animation: none; }
+.voice-heard { margin: 0; font-weight: 600; min-height: 1.5em; max-height: 9.5em; overflow-y: auto; color: var(--voice-strong); overflow-wrap: anywhere; }
+.voice-meter { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.voice-meter > span { display: block; height: 100%; background: var(--voice); transform-origin: left; transition: transform 90ms linear; }
+html[data-reduce-motion="true"] .voice-meter > span { transition: none; }
+
+/* Voice highlights (src/voice/intent/highlight.tsx): what voice control means or is doing. */
+.voice-hl-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; }
+.voice-hl {
+  position: fixed; border-radius: 12px; pointer-events: none;
+  border: 3px dashed var(--voice); background: rgba(21, 128, 61, 0.06);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 14px 3px var(--voice-glow);
+  transition: top 120ms ease-out, left 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
+}
+.voice-hl[data-state="unsure"] { border-style: dotted; }
+.voice-hl[data-state="doing"], .voice-hl[data-state="done"] { border-style: solid; background: rgba(21, 128, 61, 0.12); }
+.voice-hl[data-fading] { animation: voice-hl-out 1.2s ease-in forwards; }
+@keyframes voice-hl-out { from { opacity: 1; } to { opacity: 0; } }
+.voice-hl-tag {
+  position: absolute; left: -3px; bottom: calc(100% + 2px); max-width: min(420px, 90vw);
+  padding: 2px 8px; border-radius: 8px; background: var(--voice); color: #fff;
+  font-size: 0.82rem; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html[data-reduce-motion="true"] .voice-hl { transition: none; }
+html[data-reduce-motion="true"] .voice-hl[data-fading] { animation-duration: 0.01s; animation-delay: 1.1s; }
+@media (prefers-reduced-motion: reduce) { .voice-hl { transition: none; } }
+.voice-intent { margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--voice-strong); }
