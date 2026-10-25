@@ -21,6 +21,9 @@ html[data-contrast="high"] {
 .voice-dock[data-docked="true"] .voice-btn { box-shadow: 0 6px 22px rgba(20, 21, 26, 0.22); }
 .voice-btn { position: relative; transition: border-color 600ms ease-out, background-color 600ms ease-out, color 600ms ease-out; }
 /* Starting or reconnecting: green outline, no glow (nothing is being heard yet). */
+.voice-label { display: inline-grid; }
+.voice-label > span { grid-area: 1 / 1; visibility: hidden; text-align: left; }
+.voice-label > span[data-shown="true"] { visibility: visible; }
 .voice-btn[data-on="true"] { border-color: var(--voice); color: var(--voice-strong); background: var(--voice-bg); }
 .voice-btn[data-on="true"]:not([data-heard="true"]) { border-style: dashed; }
 /* While on, it reads as a stop button: hovering or focusing makes that unmistakable. */

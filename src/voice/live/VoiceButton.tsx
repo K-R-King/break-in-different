@@ -9,7 +9,9 @@ import "./voice.css";
 // Top-layer support (all current browsers); without it the button simply stays in the header.
 const POPOVER = typeof HTMLElement !== "undefined" && "popover" in HTMLElement.prototype;
 
-const LINGER_MS = 12000; // the last line heard stays under the button this long after listening ends
+const LINGER_MS = 12000;
+// Every label the button can show (they share one space; see .voice-label).
+const LABELS = [COPY.voice.button, COPY.voice.stopListening, COPY.voice.connecting, COPY.voice.reconnecting, COPY.voice.muted]; // the last line heard stays under the button this long after listening ends
 
 // The voice control button: green glow while the microphone is really being heard; the glow fades
 // out when listening ends. Under it, two rows: what the person is saying (or a prompt to start),
@@ -208,8 +210,16 @@ export function VoiceButton() {
             .join("+")}
           onClick={v.toggle}
         >
-          <Icon name={on ? "stop" : "mic"} filled={on} size={on ? 18 : 20} />
-          {label}
+          <Icon name={on ? "stop" : "mic"} filled={on} size={20} />
+          {/* Every label sits in the same grid cell, so the button keeps the width of the longest
+              one and never changes size as it toggles. Hidden labels are not read out. */}
+          <span className="voice-label">
+            {LABELS.map((l) => (
+              <span key={l} data-shown={l === label} aria-hidden={l !== label}>
+                {l}
+              </span>
+            ))}
+          </span>
           <kbd className="kbd">{shortcut}</kbd>
         </button>
       </div>
