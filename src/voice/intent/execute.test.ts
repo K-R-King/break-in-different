@@ -37,7 +37,7 @@ describe("execute", () => {
     expect(out.changed).toBe(false);
     expect(on(t)).toBe(false);
     expect(document.activeElement).toBe(t.el);
-    expect(out.message).toMatch(/Reduce motion: off/);
+    expect(out.message).toMatch(/Reduce motion is off/);
   });
 
   it("never presses a dangerous control", async () => {
@@ -136,4 +136,33 @@ describe("execute", () => {
       expect(out.message).toBe("Opened profile.");
     });
   });
+
+  describe("replies say what was done", () => {
+    const button = (label: string): Target => {
+      const el = document.createElement("button");
+      el.textContent = label;
+      document.body.append(el);
+      return { id: 0, kind: "button", names: [label], label, el };
+    };
+    it("in the button's own words", async () => {
+      expect((await execute(button("Refresh matches"), "press")).message).toBe("Refreshed matches.");
+      expect((await execute(button("Save"), "press")).message).toBe("Saved.");
+      expect((await execute(button("Next question"), "press")).message).toBe("Pressed Next question.");
+    });
+    it("a button that only opens a dialog says what opened, not that it was done", async () => {
+      const t = button("Delete all my data");
+      const dlg = document.createElement("dialog");
+      dlg.innerHTML = '<h2 id="del-title">Delete all your data?</h2>';
+      dlg.setAttribute("aria-labelledby", "del-title");
+      document.body.append(dlg);
+      t.el.addEventListener("click", () => dlg.setAttribute("open", ""));
+      expect((await execute(t, "press")).message).toBe("Delete all your data?");
+      dlg.remove();
+    });
+    it("switches say turned on or off, without a colon", async () => {
+      expect((await execute(checkbox(false), "on")).message).toBe("Turned on Reduce motion.");
+      expect((await execute(checkbox(true), "on")).message).toBe("Reduce motion is already on.");
+    });
+  });
 });
+

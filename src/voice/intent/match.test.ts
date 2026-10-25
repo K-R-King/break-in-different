@@ -177,3 +177,26 @@ describe("looseGuess", () => {
     expect(looseGuess("voice controls wait reader", c)).toBe(2);
   });
 });
+
+describe("action words in a control's name", () => {
+  const c: Candidate[] = [
+    { id: 1, kind: "button", names: ["Refresh matches"] },
+    { id: 2, kind: "button", names: ["Save", "save profile"] },
+    { id: 3, kind: "button", names: ["Accessibility settings", "settings"] },
+    { id: 4, kind: "text", names: ["Add a skill"] },
+    { id: 5, kind: "button", names: ["Add skill"] },
+  ];
+  it("are the verb: saying one is a request to do it", () => {
+    expect(bestMatch("refresh the matches", c)).toMatchObject({ id: 1, verb: "press", confident: true });
+    expect(bestMatch("Refresh.", c)).toMatchObject({ id: 1, verb: "press" });
+    expect(bestMatch("save my profile", c)).toMatchObject({ id: 2, verb: "press" });
+  });
+  it("a name that is not an action only selects", () => {
+    expect(bestMatch("settings", c)).toMatchObject({ id: 3, verb: null });
+    expect(bestMatch("matches", c)).toMatchObject({ id: 1, verb: null });
+  });
+  it("still leaves a text box to type in when its name says so", () => {
+    expect(bestMatch("add a skill", c)).toMatchObject({ id: 4, verb: null });
+  });
+});
+

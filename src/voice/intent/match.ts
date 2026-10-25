@@ -95,6 +95,18 @@ const VERBS: [RegExp, Verb][] = [
   [/\b(click|press|tap|hit|push)( on)?\b/g, "press"],
 ];
 
+// Action words that buttons and links start with, and how a reply says they were done. Said as the
+// first word of a control's name, one is that control's verb (see bestMatch).
+export const ACTION_PAST: Record<string, string> = {
+  refresh: "Refreshed", reload: "Reloaded", save: "Saved", add: "Added", remove: "Removed", delete: "Deleted", erase: "Erased",
+  clear: "Cleared", reset: "Reset", copy: "Copied", approve: "Approved", send: "Sent", submit: "Submitted", apply: "Applied",
+  write: "Wrote", draft: "Drafted", generate: "Generated", regenerate: "Regenerated", rewrite: "Rewrote", search: "Searched",
+  start: "Started", pause: "Paused", resume: "Resumed", play: "Played", upload: "Uploaded", download: "Downloaded",
+  cancel: "Cancelled", close: "Closed", retry: "Retried", sign: "Signed", log: "Logged", create: "Created", update: "Updated",
+  mark: "Marked", request: "Requested", dismiss: "Dismissed", undo: "Undid", hide: "Hid", expand: "Expanded", collapse: "Collapsed",
+};
+const ACTIONS = new Set(Object.keys(ACTION_PAST).map(stem));
+
 // Confirmations count as a verb only when nothing else was said: "yes" alone confirms, but
 // "select yes" chooses an option called Yes.
 const DO = /\b(do (it|that)|yes|yeah|yep|go ahead|confirm|okay|ok|sure)\b/g;
@@ -362,9 +374,16 @@ export function bestMatch(text: string, candidates: Candidate[], opts: MatchOpti
   // Naming the page already open is context ("remote jobs" on the Jobs page), not noise.
   for (const w of here) explained.add(w);
   const share = words.length ? words.filter((w) => explained.has(w)).length / words.length : 1;
+  // An action word that starts the control's own name is the verb: "refresh the matches" presses
+  // "Refresh matches", "save" presses "Save". It is a request, so it is done, not asked about.
+  const leads =
+    verb === null &&
+    (top.c.kind === "button" || top.c.kind === "link") &&
+    ACTIONS.has(words[0]) &&
+    top.c.names.some((n) => tokens(n)[0] === words[0]);
   return {
     id: top.c.id,
-    verb,
+    verb: leads ? (top.c.kind === "link" ? "go" : "press") : verb,
     score: top.score,
     confident: !rival && share > 0.5, // more than half: "stop reading" is not "Reading and voice"
     ambiguousWith: rival?.c.id,

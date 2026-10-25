@@ -185,7 +185,7 @@ export const COPY = {
     stopListening: "Stop listening",
     clickToStop: (key: string) => `Click, or press ${key}, to stop listening.`,
     clickToStart: (key: string) => `Click, or press ${key}, to start voice control. Escape stops it.`,
-    chosen: (where: string | undefined, name: string) => (where ? `${where}: ${name}.` : `${name}.`),
+    chosen: (where: string | undefined, name: string) => (where ? `Set ${where} to ${name}.` : `${name}.`),
     typing: (field: string) => `Typing in ${field}`,
     typed: (text: string) => `Typed "${text}".`,
     whichPlace: (name: string, places: string[]) =>

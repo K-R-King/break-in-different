@@ -10,7 +10,7 @@
 //   none    select only: focus and highlight, change nothing. The person hears what it is and
 //           its state, and can then say "turn it on", "press it", "yes"...
 import { COPY } from "../../copy";
-import type { Verb } from "./match";
+import { ACTION_PAST, type Verb } from "./match";
 import type { Target } from "./scan";
 import { reveal } from "./scroll";
 
@@ -30,13 +30,13 @@ function describe(t: Target): string {
   const el = t.el;
   switch (t.kind) {
     case "checkbox":
-      return `${t.label}: ${isOn(el) ? "on" : "off"}. Say "turn on", "turn off" or "toggle".`;
+      return `${t.label} is ${isOn(el) ? "on" : "off"}. Say "turn on", "turn off" or "toggle".`;
     case "radio":
-      return `${t.label}: ${isOn(el) ? "selected" : "not selected"}.${isOn(el) ? "" : ` Say "select" to choose it.`}`;
+      return `${t.label} is ${isOn(el) ? "selected" : "not selected"}.${isOn(el) ? "" : ` Say "select" to choose it.`}`;
     case "link":
       return `${t.label}, link. Say "open" to go there.`;
     case "button":
-      return isToggleButton(el) ? `${t.label}: ${isOn(el) ? "on" : "off"}. Say "turn on" or "turn off".` : `${t.label}, button. Say "press" to use it.`;
+      return isToggleButton(el) ? `${t.label} is ${isOn(el) ? "on" : "off"}. Say "turn on" or "turn off".` : `${t.label}, button. Say "press" to use it.`;
     case "group":
       return `${t.label}.`;
     default:
@@ -59,7 +59,8 @@ function setState(t: Target, want: boolean): Outcome {
   if (now !== want) el.click();
   el.focus({ preventScroll: true });
   const word = t.kind === "radio" ? (want ? "selected" : "not selected") : want ? "on" : "off";
-  return { changed: now !== want, message: now === want ? `${t.label} is already ${word}.` : `${t.label}: ${word}.`, el };
+  const done = t.kind === "radio" ? `Selected ${t.label}.` : `Turned ${word} ${t.label}.`;
+  return { changed: now !== want, message: now === want ? `${t.label} is already ${word}.` : done, el };
 }
 
 // "Open application page" is said as "Opened application page", not "Opened Open application page".
@@ -82,11 +83,29 @@ function openNewTab(t: Target, a: HTMLAnchorElement): Outcome {
   return { changed: true, message: `Opened ${linkName(t.label)} in a new tab.`, el: a };
 }
 
+// What was done, in the button's own words: "Refresh matches" → "Refreshed matches."
+function pressed(label: string): string {
+  const [first, ...rest] = label.split(" ");
+  const past = ACTION_PAST[first.toLowerCase()];
+  return past ? `${[past, ...rest].join(" ")}.` : `Pressed ${label}.`;
+}
+
+function dialogTitle(d: Element): string {
+  const by = d.getAttribute("aria-labelledby");
+  return (d.getAttribute("aria-label") || (by && document.getElementById(by)?.textContent) || "").trim();
+}
+
 function press(t: Target): Outcome {
   const a = t.el;
   if (t.kind === "link" && a instanceof HTMLAnchorElement && a.target === "_blank" && a.href) return openNewTab(t, a);
+  const before = new Set(document.querySelectorAll("dialog[open]"));
   a.click();
-  return { changed: true, message: t.kind === "link" ? `Opened ${linkName(t.label)}.` : `Pressed ${t.label}.`, el: a };
+  if (t.kind === "link") return { changed: true, message: `Opened ${linkName(t.label)}.`, el: a };
+  // A button that only opens a dialog ("Delete all my data" asks first): say what opened, not
+  // that the action was done.
+  const opened = [...document.querySelectorAll("dialog[open]")].find((d) => !before.has(d));
+  const title = opened && dialogTitle(opened);
+  return { changed: true, message: title ? (/[.?!]$/.test(title) ? title : `${title}.`) : pressed(t.label), el: a };
 }
 
 export async function execute(t: Target, verb: Verb | null): Promise<Outcome> {

@@ -209,9 +209,10 @@ export function VoiceIntent() {
           reply(COPY.voice.chosen(where, t.label));
           return;
         }
-        // Approving, sending, opening the employer's site: always the person's own "yes".
-        const needsYes = line.type === "ask" || confirmOnly;
-        if (needsYes) {
+        // The assistant decides when to ask: for a control marked confirm (approving, sending,
+        // opening the employer's site) it asks unless the person plainly told it to do exactly that.
+        // A command is not confirmed a second time.
+        if (line.type === "ask") {
           // Spelled out for the next turn, so an answer like "flexible hours" is read against it.
           const where = t.parent !== undefined ? ` in "${targets[t.parent]?.label}"` : "";
           remember("assistant", `[proposed: ${line.verb ?? "select"} "${t.label}"${where}, waiting for yes or another choice]`);
