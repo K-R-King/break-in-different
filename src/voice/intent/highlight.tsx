@@ -21,6 +21,7 @@ export interface Highlight {
 }
 
 const LINGER_MS = 1500; // a selection whose element vanished (page changed) stays this long
+const IDLE_MS = 3000; // a finished or waiting highlight fades after this long with nothing new
 const FADE_MS = 1200;
 const SETTLE_MS = 350; // a guess this stable is worth scrolling to
 
@@ -34,6 +35,21 @@ function setItems(next: Highlight[]) {
   emit();
 }
 
+// One timer per highlight: a finished ("done") or waiting ("unsure") highlight fades after IDLE_MS
+// unless something replaces it first.
+const idle = new Map<number, number>();
+function fadeWhenIdle(key: number) {
+  window.clearTimeout(idle.get(key));
+  idle.set(
+    key,
+    window.setTimeout(() => {
+      idle.delete(key);
+      const h = items.find((x) => x.key === key);
+      if (h && (h.state === "done" || h.state === "unsure")) highlights.fade(key);
+    }, IDLE_MS),
+  );
+}
+
 export const highlights = {
   subscribe(f: () => void) {
     subs.add(f);
@@ -45,7 +61,9 @@ export const highlights = {
     const rest = items.filter((h) => h.state === "done");
     const cur = items.find((h) => h.state === "hint" || h.state === "guess" || h.state === "unsure");
     if (cur && cur.el === el && cur.label === label && cur.state === state) return;
-    setItems([...rest, { key: cur?.el === el ? cur.key : nextKey++, el, label, state }]);
+    const key = cur?.el === el ? cur.key : nextKey++;
+    setItems([...rest, { key, el, label, state }]);
+    if (state === "unsure") fadeWhenIdle(key);
   },
   clearGuess() {
     if (items.some((h) => h.state === "hint" || h.state === "guess" || h.state === "unsure")) setItems(items.filter((h) => h.state === "done" || h.state === "doing"));
@@ -60,6 +78,12 @@ export const highlights = {
     const cur = items.find((h) => h.state === "doing");
     const key = cur?.key ?? nextKey++;
     setItems([...items.filter((h) => h !== cur && h.state !== "done" && h.el !== el), { key, el, label, state: "done" }]);
+    fadeWhenIdle(key);
+  },
+  // The person started something new (speaking again, scrolling, clicking, typing, moving the
+  // mouse): every highlight goes, except an action still running.
+  dismiss() {
+    for (const h of items) if (h.state !== "doing") highlights.fade(h.key);
   },
   // Fade out and remove one highlight, or every selection after `delay` ms.
   fade(key: number) {
@@ -161,7 +185,40 @@ export function shown(list: Highlight[]): Highlight[] {
   return (active.length ? active : list).slice(-1);
 }
 
+// Manual interaction dismisses the highlights. Physical input only (wheel, touch, keys, pointer),
+// so voice control's own scrolling and clicks never count; small mouse jitter is ignored.
+function useDismissOnInteraction() {
+  useEffect(() => {
+    let moved = 0;
+    let last: { x: number; y: number } | null = null;
+    const dismiss = () => {
+      moved = 0;
+      if (items.some((h) => h.state !== "doing" && !h.fading)) highlights.dismiss();
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      if (last) moved += Math.abs(e.clientX - last.x) + Math.abs(e.clientY - last.y);
+      last = { x: e.clientX, y: e.clientY };
+      if (moved > 12) dismiss();
+    };
+    const opts = { capture: true, passive: true } as const;
+    window.addEventListener("wheel", dismiss, opts);
+    window.addEventListener("touchmove", dismiss, opts);
+    window.addEventListener("pointerdown", dismiss, opts);
+    window.addEventListener("keydown", dismiss, opts);
+    window.addEventListener("pointermove", onMove, opts);
+    return () => {
+      window.removeEventListener("wheel", dismiss, opts);
+      window.removeEventListener("touchmove", dismiss, opts);
+      window.removeEventListener("pointerdown", dismiss, opts);
+      window.removeEventListener("keydown", dismiss, opts);
+      window.removeEventListener("pointermove", onMove, opts);
+    };
+  }, []);
+}
+
 export function HighlightLayer() {
+  useDismissOnInteraction();
   const list = shown(useHighlights());
   const byHost = new Map<Element, Highlight[]>();
   for (const h of list) {
