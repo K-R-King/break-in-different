@@ -7,6 +7,7 @@ import { internalAction, internalMutation, internalQuery } from "./_generated/se
 import { internal } from "./_generated/api";
 import { DEMO_EMPLOYERS, DEMO_JOBS, demoApplyUrl } from "../shared/fixtures/demo-jobs";
 import { sha256 } from "./lib/text";
+import { checkAccommodationEmails } from "./lib/accommodationContact";
 import { EXTRACTION_VERSION } from "./ai/prompts";
 import snapshot from "./seedData/snapshot.json";
 
@@ -58,6 +59,7 @@ export const demoJobs = internalMutation({
           .query("jobs")
           .withIndex("by_source_external", (q) => q.eq("source", "demo").eq("externalId", j.key))
           .unique();
+        const contentHash = await sha256(j.descriptionText);
         const doc = {
           source: "demo",
           externalId: j.key,
@@ -74,7 +76,8 @@ export const demoJobs = internalMutation({
           sourceUrl: demoApplyUrl(j.key),
           fetchedAt: now,
           status: "open" as const,
-          contentHash: await sha256(j.descriptionText),
+          contentHash,
+          accommodationEmail: checkAccommodationEmails(j.descriptionText, contentHash, now),
           dedupeKey: `demo:${j.key}`,
           skills: j.skills,
           accommodations: j.accommodations,
@@ -130,6 +133,7 @@ export const demo = internalAction({
       });
       snapshotInserted += r.inserted;
     }
+    await ctx.runMutation(internal.jobs.refreshAccommodationEmails, {});
     await ctx.scheduler.runAfter(0, internal.ingest.run.extractPending, {});
     return {
       demoInserted,

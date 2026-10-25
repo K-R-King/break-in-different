@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { internalQuery, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { requireUser } from "./lib/auth";
 import { fail } from "./lib/errors";
-import { findAccommodationContact } from "./lib/accommodationContact";
+import { accommodationEmailIsCurrent, checkAccommodationEmails, currentAccommodationEmail, findAccommodationContact } from "./lib/accommodationContact";
 
 export const get = query({
   args: { jobId: v.string() },
@@ -34,6 +34,8 @@ export const get = query({
       accommodationForm: job.accommodationForm ?? null,
       // The listing's own accommodation statement and request address, if it gives one.
       accommodationContact: findAccommodationContact(job.descriptionText),
+      // Addresses the listing gives for accommodation requests, with the listing's own words.
+      accommodationEmail: currentAccommodationEmail(job),
       sourceUrl: job.sourceUrl,
       source: job.source,
       fetchedAt: job.fetchedAt,
@@ -70,5 +72,22 @@ export const speakableText = internalQuery({
     if (!job) return null;
     const text = section === "summary" ? job.summary || job.descriptionText : job.descriptionText;
     return text.slice(0, 1500);
+  },
+});
+
+// Stores a fresh accommodation-email check on open jobs whose stored result is missing or was
+// checked against older listing text or an older detector. Run by seed:demo; safe to rerun:
+// `npx convex run jobs:refreshAccommodationEmails`.
+export const refreshAccommodationEmails = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    let refreshed = 0;
+    for (const job of await ctx.db.query("jobs").withIndex("by_status", (q) => q.eq("status", "open")).collect()) {
+      if (accommodationEmailIsCurrent(job)) continue;
+      await ctx.db.patch(job._id, { accommodationEmail: checkAccommodationEmails(job.descriptionText, job.contentHash, now) });
+      refreshed++;
+    }
+    return { refreshed };
   },
 });

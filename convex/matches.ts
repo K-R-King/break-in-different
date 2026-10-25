@@ -13,6 +13,7 @@ import { scoreJob, templateExplanation } from "./match/scorer";
 import { explainMatches } from "./ai/prompts";
 import { aiEnabled } from "./ai/claude";
 import { explanationIsGrounded } from "./ai/validators";
+import { currentAccommodationEmail } from "./lib/accommodationContact";
 
 const AGENT_ALIVE_MS = 10_000;
 
@@ -332,13 +333,17 @@ export const list = query({
           isDemo: job.isDemo,
           accommodations: job.accommodations,
           accommodationForm: job.accommodationForm ?? null,
+          // Same source as jobs.get, so the card and the details panel always agree.
+          accommodationEmail: currentAccommodationEmail(job),
         },
         saved: appByJob.has(job._id),
         applicationStatus: appByJob.get(job._id)?.status ?? null,
       });
     }
-    // Jobs that link to the employer's own accommodation form come first, then by match score.
-    items.sort((a, b) => Number(!!b.job.accommodationForm) - Number(!!a.job.accommodationForm) || b.score - a.score);
+    // Jobs that show how to request accommodations (the employer's own form, or an address the
+    // listing ties to requests) come first, then by match score. One boost, even with both.
+    const canRequest = (it: { job: { accommodationForm: unknown; accommodationEmail: { status: string } } }) => Number(!!it.job.accommodationForm || it.job.accommodationEmail.status === "verified");
+    items.sort((a, b) => canRequest(b) - canRequest(a) || b.score - a.score);
 
     const lastRequest = await ctx.db
       .query("matchRequests")

@@ -12,6 +12,7 @@ import { EXTRACTION_VERSION, extractListing } from "../ai/prompts";
 import { aiEnabled } from "../ai/claude";
 import { verifyAccommodations, verifyQuote } from "../ai/validators";
 import { vAccommodationForm, vRoleFamily, vWorkplaceType } from "../schema";
+import { accommodationEmailIsCurrent, checkAccommodationEmails } from "../lib/accommodationContact";
 
 const vListing = v.object({
   source: v.string(),
@@ -179,11 +180,19 @@ export const upsertBatch = internalMutation({
         .query("jobs")
         .withIndex("by_source_external", (q) => q.eq("source", l.source).eq("externalId", l.externalId))
         .unique();
+      // Accommodation emails are rechecked whenever the listing text changes (or the detector does).
+      const accommodationEmail = () => checkAccommodationEmails(l.descriptionText, l.contentHash, Date.now());
       if (existing) {
         if (existing.contentHash === l.contentHash) {
-          await ctx.db.patch(existing._id, { fetchedAt: now, status: "open", closedAt: undefined, accommodationForm: l.accommodationForm });
+          await ctx.db.patch(existing._id, {
+            fetchedAt: now,
+            status: "open",
+            closedAt: undefined,
+            accommodationForm: l.accommodationForm,
+            ...(accommodationEmailIsCurrent(existing) ? {} : { accommodationEmail: accommodationEmail() }),
+          });
         } else {
-          await ctx.db.patch(existing._id, { ...fields, fetchedAt: now, status: "open", closedAt: undefined, extractionVersion: 0 });
+          await ctx.db.patch(existing._id, { ...fields, accommodationEmail: accommodationEmail(), fetchedAt: now, status: "open", closedAt: undefined, extractionVersion: 0 });
           updated++;
         }
         continue;
@@ -196,6 +205,7 @@ export const upsertBatch = internalMutation({
       if (dup) continue;
       await ctx.db.insert("jobs", {
         ...fields,
+        accommodationEmail: accommodationEmail(),
         employerId,
         experienceLevel: "not_stated",
         fetchedAt: now,

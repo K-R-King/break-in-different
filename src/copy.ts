@@ -74,7 +74,7 @@ export const COPY = {
   },
   jobs: {
     formBadge: "Accommodation form",
-    sortNote: "Jobs with an accommodation form come first, then by match score.",
+    sortNote: "Jobs that show how to request accommodations (a form or an email) come first, then by match score.",
     conflictFilter: "Hide jobs that conflict with my required accommodations",
     conflictFilterHint: "For example, a listing that says five days on-site when you need remote work. Listings that say nothing stay.",
     filteredEmptyTitle: "No jobs left with these accommodation filters",
