@@ -163,7 +163,7 @@ html[data-layout="fit"] #root > main { flex: 1; min-height: 0; width: 100%; }
 
 /* Tracker: the table scrolls inside its panel, with the column headings kept in view. When the page
    fits the window the panel fills the rest of it and scrolls both ways. */
-.tracker-table { overflow: auto; scroll-padding-top: 52px; max-height: max(320px, calc(100dvh - 120px)); }
+.tracker-table { overflow: auto; scroll-padding-top: 52px; max-height: max(360px, calc(100dvh - 90px)); }
 .tracker-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); box-shadow: inset 0 -2px 0 var(--ink); }
 html[data-layout="fit"] .tracker-page { padding-bottom: 16px !important; }
 html[data-layout="fit"] .tracker-page > * { flex: none; }

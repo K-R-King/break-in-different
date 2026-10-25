@@ -51,7 +51,7 @@ export default function TrackerPage() {
   const counts = APPLICATION_STATUSES.map((s) => ({ s, n: (rows ?? []).filter((r) => r.status === s).length }));
 
   return (
-    <main id="main" className="container stack tracker-page" style={{ paddingBlock: "32px 56px", gap: 24 }}>
+    <main id="main" className="container stack tracker-page" style={{ paddingBlock: "20px 24px", gap: 14, maxWidth: 1400 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
           <PageHeading>{COPY.tracker.title}</PageHeading>
@@ -78,8 +78,8 @@ export default function TrackerPage() {
         <>
           <ul aria-label="Totals" className="row" style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {counts.map(({ s, n }) => (
-              <li key={s} className="panel" style={{ padding: "14px 18px", minWidth: 150, display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: "1.65rem", fontWeight: 800 }}>{n}</span>
+              <li key={s} className="panel" style={{ padding: "8px 16px", minWidth: 130, display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontSize: "1.35rem", fontWeight: 800 }}>{n}</span>
                 <span style={{ fontWeight: 600 }}>{STATUS_LABELS[s]}</span>
               </li>
             ))}
