@@ -54,6 +54,9 @@ function byIds(ids: string | null): string {
     .join(" ");
 }
 
+// The screen reader note on links that open a new tab: not part of the name people say or hear.
+const NEW_TAB = /\s*\(opens in a new (tab|window)\)/gi;
+
 function controlName(el: HTMLElement): string {
   if (el.dataset.voiceLabel) return el.dataset.voiceLabel;
   const aria = el.getAttribute("aria-label") || byIds(el.getAttribute("aria-labelledby"));
@@ -175,7 +178,7 @@ export function scanPage(root: ParentNode = document): Target[] {
   for (const el of root.querySelectorAll<HTMLElement>(CONTROLS)) {
     if ((el as HTMLButtonElement).disabled || el.getAttribute("aria-disabled") === "true") continue;
     // A control's label wraps it: reach the input through its own box, not the label's.
-    const name = controlName(el);
+    const name = controlName(el).replace(NEW_TAB, "");
     const alts = altNames(el);
     if (!name && !alts.length) continue;
     const r = reach(el);

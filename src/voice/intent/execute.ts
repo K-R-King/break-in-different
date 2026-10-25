@@ -61,9 +61,33 @@ function setState(t: Target, want: boolean): Outcome {
   return { changed: now !== want, message: now === want ? `${t.label} is already ${word}.` : `${t.label}: ${word}.`, el };
 }
 
+// "Open application page" is said as "Opened application page", not "Opened Open application page".
+const linkName = (label: string) => label.replace(/^(open|go to|visit|view|see|show)\s+/i, "") || label;
+
+// A link that opens a new tab: browsers block a scripted click without the person's own click or
+// key press, which a voice command never has. Open the tab directly; if that is blocked too, follow
+// the link in this tab, so it still goes where the person asked.
+function openNewTab(a: HTMLAnchorElement): boolean {
+  // The link's own click handler still runs (it may note that the person left for the employer's site).
+  a.addEventListener("click", (e) => e.preventDefault(), { once: true });
+  a.click();
+  const tab = window.open(a.href, "_blank");
+  if (tab) {
+    tab.opener = null;
+    return true;
+  }
+  window.location.assign(a.href);
+  return false;
+}
+
 function press(t: Target): Outcome {
-  t.el.click();
-  return { changed: true, message: t.kind === "link" ? `Opened ${t.label}.` : `Pressed ${t.label}.`, el: t.el };
+  if (t.kind !== "link") {
+    t.el.click();
+    return { changed: true, message: `Pressed ${t.label}.`, el: t.el };
+  }
+  const a = t.el;
+  const newTab = a instanceof HTMLAnchorElement && a.target === "_blank" && !!a.href ? openNewTab(a) : (a.click(), false);
+  return { changed: true, message: `Opened ${linkName(t.label)}${newTab ? " in a new tab" : ""}.`, el: a };
 }
 
 export async function execute(t: Target, verb: Verb | null): Promise<Outcome> {
@@ -136,7 +160,7 @@ export function intentLabel(t: Target, verb: Verb | null): string {
     case "radio":
       return verb === "off" ? where : verb === "go" ? `Show: ${where}` : `Select: ${where}`;
     case "link":
-      return `Go to: ${where}`;
+      return `Go to: ${linkName(where)}`;
     case "button":
       return verb === "off" && isToggleButton(t.el) ? `Turn off: ${where}` : `Press: ${where}`;
     default:

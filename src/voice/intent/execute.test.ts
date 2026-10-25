@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { execute } from "./execute";
 import type { Target } from "./scan";
 
@@ -78,5 +78,50 @@ describe("execute", () => {
     expect(el.getAttribute("aria-pressed")).toBe("true");
     await execute({ ...save, commandWay: "off" }, null);
     expect(el.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  describe("links", () => {
+    afterEach(() => vi.restoreAllMocks());
+    const link = (label: string, newTab: boolean): Target => {
+      const el = document.createElement("a");
+      el.href = "https://employer.example/apply";
+      if (newTab) el.target = "_blank";
+      el.textContent = label;
+      document.body.append(el);
+      return { id: 0, kind: "link", names: [label], label, el };
+    };
+
+    it("opens a new-tab link itself, since browsers block a scripted click, and still runs its handler", async () => {
+      const tab = { opener: window } as unknown as Window;
+      const open = vi.spyOn(window, "open").mockReturnValue(tab);
+      const t = link("Open application page", true);
+      let handled = false;
+      let followed = true;
+      t.el.addEventListener("click", (e) => {
+        handled = true;
+        queueMicrotask(() => (followed = !e.defaultPrevented));
+      });
+      const out = await execute(t, "go");
+      await Promise.resolve();
+      expect(handled).toBe(true);
+      expect(followed).toBe(false); // the blocked native click is not attempted as well
+      expect(open).toHaveBeenCalledWith("https://employer.example/apply", "_blank");
+      expect(tab.opener).toBeNull();
+      expect(out.message).toBe("Opened application page in a new tab.");
+    });
+
+    it("never says the verb twice, and clicks same-tab links as usual", async () => {
+      const open = vi.spyOn(window, "open");
+      const t = link("Go to profile", false);
+      let clicked = false;
+      t.el.addEventListener("click", (e) => {
+        clicked = true;
+        e.preventDefault(); // jsdom cannot navigate
+      });
+      const out = await execute(t, "go");
+      expect(clicked).toBe(true);
+      expect(open).not.toHaveBeenCalled();
+      expect(out.message).toBe("Opened profile.");
+    });
   });
 });
