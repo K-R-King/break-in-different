@@ -116,6 +116,14 @@ export async function execute(t: Target, verb: Verb | null): Promise<Outcome> {
   }
 }
 
+// Puts text into a text field as if typed (React sees the change), and focuses it.
+export function fillText(el: HTMLElement, text: string) {
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, text);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.focus({ preventScroll: true });
+}
+
 // What the highlight tag says before acting.
 export function intentLabel(t: Target, verb: Verb | null): string {
   const where = t.opener ? `Settings › ${t.label}` : t.label;

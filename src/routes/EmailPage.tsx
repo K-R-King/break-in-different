@@ -242,7 +242,7 @@ export default function EmailPage() {
             <p style={{ margin: 0 }}>{COPY.email.formBody}</p>
             <blockquote className="quote small">Listing says: "{job.accommodationForm.quote}"</blockquote>
             <span className="row" style={{ gap: 12 }}>
-              <a className="btn btn-primary" href={job.accommodationForm.url} target="_blank" rel="noopener noreferrer" data-voice-names="accommodation form|employer's form|their form">
+              <a className="btn btn-primary" href={job.accommodationForm.url} target="_blank" rel="noopener noreferrer" data-voice-confirm data-voice-names="accommodation form|employer's form|their form">
                 {COPY.email.formOpen}<Icon name="external" size={18} /><span className="sr-only"> (opens in a new tab)</span>
               </a>
               <span className="small">{COPY.email.formPreferEmail}</span>
@@ -310,7 +310,7 @@ export default function EmailPage() {
             {/* Once a draft exists, "Write a new draft" sits with the draft (and lights up when it is out of date). */}
             {!latest && (
               <button className="btn btn-primary" type="button" onClick={() => void generate()} disabled={busy} style={{ alignSelf: "flex-start" }}
-                data-voice-command data-voice-names="write the draft|write the email|draft the email">
+                data-voice-command data-voice-names="write the draft|write the email|draft the email" data-voice-say="Writing your draft. It takes a few seconds.">
                 {busy ? "Drafting…" : "Write my draft"}
               </button>
             )}
@@ -392,16 +392,17 @@ export default function EmailPage() {
           <div className="row">
             {/* Approving is the person's own consent: saying "approve the email" does it. */}
             <button className="btn btn-primary btn-lg" type="button" onClick={() => void onApprove()} disabled={!latest || busy || approved || needsName}
-              data-voice-command data-voice-names="approve|approve it|approve the email|I approve|looks good"
+              data-voice-command data-voice-confirm data-voice-names="approve|approve it|approve the email|I approve|looks good"
+              data-voice-say="Approved. You can copy it or open it in your mail app now."
               aria-describedby={needsName ? "name-why" : undefined} style={{ minHeight: 52 }}>
               {approved ? "Approved" : "Approve draft"}
             </button>
             <button className="btn btn-secondary" type="button" disabled={!approved} aria-describedby={!approved ? "lock-why" : undefined} onClick={() => void onCopy()}
-              data-voice-command data-voice-names="copy|copy it|copy the email">
+              data-voice-command data-voice-confirm data-voice-names="copy|copy it|copy the email" data-voice-say="Copied. Paste it into your email.">
               <Icon name="copy" size={18} />{copied && approved ? "Copied" : "Copy email"}
             </button>
             {approved ? (
-              <a className="btn btn-secondary" href={mailto} data-voice-command data-voice-names="open my mail|open in mail|email it|send it from my mail app"><Icon name="mail" size={18} />Open in mail app</a>
+              <a className="btn btn-secondary" href={mailto} data-voice-command data-voice-confirm data-voice-names="open my mail|open in mail|email it|send it from my mail app"><Icon name="mail" size={18} />Open in mail app</a>
             ) : (
               <button className="btn btn-secondary" type="button" disabled aria-describedby="lock-why"><Icon name="mail" size={18} />Open in mail app</button>
             )}
@@ -416,14 +417,14 @@ export default function EmailPage() {
               <p className="hint">Opens in a new tab. We'll ask if you applied when you come back.</p>
             </div>
             <a className="btn btn-secondary" href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={() => { awayToEmployer.current = true; }}
-              data-voice-names="apply|apply on their site|employer site|employer's website|employer's application page">
+              data-voice-confirm data-voice-names="apply|apply on their site|employer site|employer's website|employer's application page">
               Open application page<Icon name="external" size={18} /><span className="sr-only"> (opens in a new tab)</span>
             </a>
           </div>
           {askApplied && (
             <div role="region" aria-label="Did you apply?" className="row" style={{ padding: "14px 16px", borderRadius: 12, border: "2px solid var(--ink)" }}>
               <p style={{ margin: 0, fontWeight: 700, flex: "1 1 220px" }}>Back from the employer's site. Did you apply?</p>
-              <button className="btn btn-primary" type="button" onClick={() => void onMarkApplied()} data-voice-command data-voice-names="I applied|yes I applied|mark applied">Mark as applied</button>
+              <button className="btn btn-primary" type="button" onClick={() => void onMarkApplied()} data-voice-command data-voice-confirm data-voice-names="I applied|yes I applied|mark applied" data-voice-say="Marked as applied in your tracker.">Mark as applied</button>
               <button className="btn btn-ghost" type="button" onClick={() => setAskApplied(false)} data-voice-command data-voice-names="not yet|I haven't applied">Not yet</button>
             </div>
           )}

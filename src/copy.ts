@@ -140,6 +140,12 @@ export const COPY = {
     unsure: (name: string) => `Did you mean "${name}"? Say "yes", or say it again with more detail.`,
     dismissed: "Okay.",
     maybe: (name: string) => `${name}?`,
+    thinking: "Thinking…",
+    chosen: (where: string | undefined, name: string) => (where ? `${where}: ${name}.` : `${name}.`),
+    typing: (field: string) => `Typing in ${field}`,
+    typed: (text: string) => `Typed "${text}".`,
+    whichPlace: (name: string, places: string[]) =>
+      places.length ? `"${name}" for which one: ${places.slice(0, 3).join(", ")}${places.length > 3 ? ", or another" : ""}?` : `Which "${name}"?`,
     whichOne: (a: string, b: string) => `"${a}" or "${b}"? Say which one.`,
   },
   tts: {

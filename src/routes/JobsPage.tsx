@@ -408,10 +408,12 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
       </div>
       <div className="row">
         <Link className="btn btn-primary btn-lg" to={`/jobs/${jobId}/email`} style={{ minHeight: 52 }}
-          data-voice-names="apply|apply for this job|request accommodations|ask for accommodations|accommodation email|email the employer|write the email|draft an email">Request accommodations and apply</Link>
+          data-voice-names="apply|apply for this job|request accommodations|ask for accommodations|accommodation email|email the employer|write the email|draft an email"
+          data-voice-say="Here's the accommodation email for this job. Choose what to ask for, then I can write the draft.">Request accommodations and apply</Link>
         <button className="btn btn-secondary" type="button" aria-pressed={item.saved} onClick={onToggleSave} data-voice-command={item.saved ? "off" : "on"}
-          data-voice-names={item.saved ? "saved|unsave this job|remove from saved" : "save this job|save job|bookmark|bookmark this job"}><Icon name="bookmark" size={18} filled={item.saved} />{item.saved ? "Saved" : "Save"}</button>
-        <Link className="btn btn-secondary" to={`/jobs/${jobId}/practice`} data-voice-names="practice interview|interview practice|mock interview|practice for this job|rehearse"><Icon name="mic" size={18} />{COPY.practice.entry}</Link>
+          data-voice-names={item.saved ? "saved|unsave this job|remove from saved" : "save this job|save job|bookmark|bookmark this job"}
+          data-voice-say={item.saved ? "Removed from your saved jobs." : "Saved. It's in your application tracker."}><Icon name="bookmark" size={18} filled={item.saved} />{item.saved ? "Saved" : "Save"}</button>
+        <Link className="btn btn-secondary" to={`/jobs/${jobId}/practice`} data-voice-names="practice interview|interview practice|mock interview|practice for this job|rehearse" data-voice-say="Here's the practice interview for this job. Say start when you're ready."><Icon name="mic" size={18} />{COPY.practice.entry}</Link>
       </div>
 
       {job.accommodationForm && <EmployerFormCallout form={job.accommodationForm} employer={job.employer?.name ?? "This employer"} jobId={jobId} />}
@@ -491,7 +493,7 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
       </div>
       <p className="small muted" style={{ margin: 0 }}>
         Source: {sourceName(job.source)} · checked {timeAgo(job.fetchedAt)} ·{" "}
-        <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" data-voice-names="employer's website|employer site|job posting|original posting|apply on their site">Open the employer's application page<span className="sr-only"> (opens in a new tab)</span></a>
+        <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" data-voice-confirm data-voice-names="employer's website|employer site|job posting|original posting|apply on their site">Open the employer's application page<span className="sr-only"> (opens in a new tab)</span></a>
       </p>
       <LabelLegend />
     </section>
@@ -506,7 +508,7 @@ function EmployerFormCallout({ form, employer, jobId }: { form: { url: string; q
         <strong>{COPY.email.formTitle(employer)}</strong>
         <blockquote className="quote small">Listing says: "{form.quote}"</blockquote>
         <span className="row" style={{ gap: 8 }}>
-          <a className="btn btn-primary btn-sm" href={form.url} target="_blank" rel="noopener noreferrer" data-voice-names="accommodation form|employer's form|their form">
+          <a className="btn btn-primary btn-sm" href={form.url} target="_blank" rel="noopener noreferrer" data-voice-confirm data-voice-names="accommodation form|employer's form|their form">
             {COPY.email.formOpen}<Icon name="external" size={16} /><span className="sr-only"> (opens in a new tab)</span>
           </a>
           <Link className="btn btn-secondary btn-sm" to={`/jobs/${jobId}/email`}>Draft an email instead</Link>

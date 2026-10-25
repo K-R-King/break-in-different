@@ -268,8 +268,8 @@ export default function ProfilePage() {
             {status}
           </p>
           <div className="row">
-            <button className="btn btn-secondary" type="button" onClick={() => void doSave()} disabled={busy} data-voice-names="save profile|save changes|save my profile">Save</button>
-            <button className="btn btn-primary btn-lg" type="button" onClick={() => void saveAndFind()} disabled={busy} style={{ minHeight: 52 }} data-voice-names="save and search|find matching jobs|save and see jobs">
+            <button className="btn btn-secondary" type="button" onClick={() => void doSave()} disabled={busy} data-voice-names="save profile|save changes|save my profile" data-voice-say="Your profile is saved.">Save</button>
+            <button className="btn btn-primary btn-lg" type="button" onClick={() => void saveAndFind()} disabled={busy} style={{ minHeight: 52 }} data-voice-names="save and search|find matching jobs|save and see jobs" data-voice-say="Saved. Finding jobs that fit you.">
               Save and find jobs
             </button>
           </div>
