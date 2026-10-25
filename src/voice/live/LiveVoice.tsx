@@ -5,9 +5,12 @@ import { useAnnounce } from "../../a11y/Announcer";
 import { COPY } from "../../copy";
 import { ListenSession, type ListenSnapshot } from "./session";
 import { voiceKeyterms } from "../intent/keyterms";
+import { Speaker } from "../agent/speech";
+import { getVoiceSettings } from "../agent/settings";
 
 interface LiveVoiceCtx extends ListenSnapshot {
   session: ListenSession;
+  speaker: Speaker; // the assistant's spoken replies
   toggle: () => void;
   stop: () => void;
 }
@@ -38,6 +41,10 @@ export function LiveVoiceProvider({ children }: { children: ReactNode }) {
       }),
     [],
   );
+  const speaker = useMemo(() => new Speaker(async () => {
+    const t = await mintRef.current({});
+    return { token: t.token, voiceId: t.voiceId };
+  }), []);
   const snap = useSyncExternalStore(session.subscribe, session.getSnapshot);
 
   // Announce state changes once (not every partial transcript).
@@ -54,11 +61,22 @@ export function LiveVoiceProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated && session.active) session.stop();
   }, [isAuthenticated, session]);
   useEffect(() => () => session.stop(), [session]);
+  useEffect(() => () => speaker.close(), [speaker]);
+  useEffect(() => {
+    if (snap.status === "off") speaker.stop();
+    if (snap.status === "listening" && getVoiceSettings().speak) speaker.warm();
+  }, [snap.status, speaker]);
 
   const value: LiveVoiceCtx = {
     ...snap,
     session,
-    toggle: () => (session.active ? session.stop() : session.start()),
+    speaker,
+    // Starting is a click or key press: the moment the browser allows audio to be unlocked.
+    toggle: () => {
+      if (session.active) return session.stop();
+      speaker.unlock();
+      session.start();
+    },
     stop: () => session.stop(),
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

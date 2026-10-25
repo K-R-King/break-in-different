@@ -68,6 +68,18 @@ function press(t: Target): Outcome {
 
 export async function execute(t: Target, verb: Verb | null): Promise<Outcome> {
   const name = t.label;
+  // A dropdown option without a verb: only select the dropdown.
+  if (t.run && !t.command && (verb === null || verb === "go")) {
+    t.el.focus({ preventScroll: true });
+    return { changed: false, message: `${name}. Say "select" to choose it.`, el: t.el };
+  }
+  // A voice-only command, or a chosen dropdown option.
+  if (t.run) {
+    if (verb === "off") return { changed: false, message: `${name} can't be turned off.`, el: t.el };
+    await t.run();
+    const m = typeof t.message === "function" ? t.message() : t.message;
+    return { changed: true, message: m ?? `${name}.`, el: t.el };
+  }
   const changes = verb !== null && verb !== "go";
   if (t.danger && changes) return { changed: false, message: `For your safety, "${name}" can't be done by voice. Use the keyboard or mouse.`, el: t.el };
 
@@ -91,21 +103,32 @@ export async function execute(t: Target, verb: Verb | null): Promise<Outcome> {
       if (isToggleButton(t.el)) {
         if (verb === "on") return setState(t, true);
         if (verb === "off") return setState(t, false);
+        // Saying a toggle command's name turns it the way it says (Save on, Unsave off), never back.
+        if (verb === null && t.command) return setState(t, t.commandWay !== "off");
       } else if (verb === "off") return { changed: false, message: `${name} is a button, not a switch.`, el: t.el };
-      if (verb === "on" || verb === "toggle" || verb === "press" || verb === "do" || verb === "go") return press(t);
+      if (verb === "on" || verb === "toggle" || verb === "press" || verb === "do" || verb === "go" || (verb === null && t.command)) return press(t);
       return select(t);
     case "link":
-      if (verb === "go" || verb === "press" || verb === "do" || verb === "on" || verb === "select") return press(t);
+      if (verb === "go" || verb === "press" || verb === "do" || verb === "on" || verb === "select" || (verb === null && t.command)) return press(t);
       return select(t);
     default:
       return select(t);
   }
 }
 
+// Puts text into a text field as if typed (React sees the change), and focuses it.
+export function fillText(el: HTMLElement, text: string) {
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, text);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.focus({ preventScroll: true });
+}
+
 // What the highlight tag says before acting.
 export function intentLabel(t: Target, verb: Verb | null): string {
   const where = t.opener ? `Settings › ${t.label}` : t.label;
   if (t.danger && verb && verb !== "go") return `${where} (keyboard only)`;
+  if (t.run || (t.command && verb === null)) return where;
   if (verb === null) return where;
   switch (t.kind) {
     case "checkbox":

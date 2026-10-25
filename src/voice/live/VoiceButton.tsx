@@ -60,6 +60,7 @@ export function VoiceButton() {
       e.preventDefault();
       if (mode === "toggle") return v.toggle();
       held = true;
+      v.speaker.unlock();
       v.session.start();
     };
     // Hold mode: letting go of the key or a modifier finishes what was said, then stops.

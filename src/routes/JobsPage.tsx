@@ -13,6 +13,8 @@ import { AccommodationRow, LabelBadge, sourceName, timeAgo } from "../components
 import { Icon } from "../components/Icon";
 import { HighlightedText, useReader } from "../voice/reader";
 import { useVoiceHandlers } from "../voice/VoiceProvider";
+import { useVoiceActions } from "../voice/intent/actions";
+import { ACCOMMODATION_VOICE, voiceNames } from "../voice/vocabulary";
 import { toAppError } from "../lib/errors";
 import { useFitLayout } from "../lib/useFitLayout";
 
@@ -113,9 +115,20 @@ export default function JobsPage() {
   };
   const readJob = (it: Item, summary: string) => void reader.play(it.jobId, prefs.voiceReader ? "full" : "summary", summary);
 
+  const nextItem = items[Math.min(items.length - 1, selectedIndex + 1)];
+  const previousItem = items[Math.max(0, selectedIndex - 1)];
+  const goTo = (it: Item | undefined) => { if (it) { setSelected(it.jobId); focusCard(it.jobId); announce(`${it.job.title} at ${it.job.employerName}`); } };
+  // Voice: move through the results without naming a job.
+  useVoiceActions([
+    { names: ["Next job", "next", "next one", "next listing", "skip this one"], run: () => goTo(nextItem), anchor: () => (nextItem ? document.getElementById(`job-${nextItem.jobId}`) : null),
+      message: () => (nextItem ? `${nextItem.job.title} at ${nextItem.job.employerName}.` : "That was the last job."), when: () => items.length > 0 && selectedIndex < items.length - 1 },
+    { names: ["Previous job", "previous", "previous one", "the one before"], run: () => goTo(previousItem), anchor: () => (previousItem ? document.getElementById(`job-${previousItem.jobId}`) : null),
+      message: () => (previousItem ? `${previousItem.job.title} at ${previousItem.job.employerName}.` : "This is the first job."), when: () => selectedIndex > 0 },
+  ]);
+
   useVoiceHandlers({
-    next: () => { const n = items[Math.min(items.length - 1, selectedIndex + 1)]; if (n) { setSelected(n.jobId); focusCard(n.jobId); announce(`${n.job.title} at ${n.job.employerName}`); } },
-    previous: () => { const p = items[Math.max(0, selectedIndex - 1)]; if (p) { setSelected(p.jobId); focusCard(p.jobId); announce(`${p.job.title} at ${p.job.employerName}`); } },
+    next: () => goTo(nextItem),
+    previous: () => goTo(previousItem),
     open: () => { document.getElementById("detail-heading")?.focus(); },
     read: () => { if (current) readJob(current, current.job.title); },
     stop: () => reader.stop(),
@@ -203,7 +216,8 @@ export default function JobsPage() {
                 <legend className="sr-only">Required accommodations</legend>
                 {ACCOMMODATION_CODES.map((code) => (
                   <label key={code} className="ck">
-                    <input type="checkbox" checked={requiredSet.has(code)} disabled={!profile || running} onChange={(e) => void setRequired(code, e.target.checked)} />
+                    <input type="checkbox" checked={requiredSet.has(code)} disabled={!profile || running} onChange={(e) => void setRequired(code, e.target.checked)}
+                      data-voice-names={voiceNames(ACCOMMODATION_VOICE[code])} />
                     <span>
                       {ACCOMMODATION_LABELS[code]}
                       {profile?.preferredAccommodations.includes(code) && <span className="muted"> (preferred)</span>}
@@ -220,18 +234,19 @@ export default function JobsPage() {
                 <input type="checkbox" checked={formOnly} onChange={(e) => setFormOnly(e.target.checked)} />
                 <span><strong>{COPY.jobs.formFilter}</strong><span className="small muted" style={{ display: "block" }}>{COPY.jobs.formFilterHint}</span></span>
               </label>
-              <Link to="/profile#s3" style={{ fontWeight: 600 }}>Edit in your profile</Link>
+              <Link to="/profile#s3" style={{ fontWeight: 600 }} data-voice-names="edit my accommodations|change my accommodations">Edit in your profile</Link>
             </div>
           </aside>
 
-          <section className="jobs-col main" aria-labelledby="res-h" aria-busy={running || data === undefined} data-voice-scroll>
+          <section className="jobs-col main" aria-labelledby="res-h" aria-busy={running || data === undefined} data-voice-scroll
+            data-voice-names="results|job results|job list|the list|matches">
             <div className="row jobs-results-bar" style={{ justifyContent: "space-between" }}>
               <h2 id="res-h" style={{ margin: 0, fontSize: "1.2rem" }}>
                 {running || data === undefined ? COPY.jobs.finding : `${items.length} jobs found`}
               </h2>
               <div className="row" style={{ gap: 8 }}>
                 <span className="small muted">{COPY.jobs.sortNote}</span>
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => void doRun()} disabled={running}>Refresh matches</button>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={() => void doRun()} disabled={running} data-voice-names="refresh|refresh jobs|update matches|reload jobs">Refresh matches</button>
               </div>
             </div>
             {data?.engine === "fallback" && <p className="note" data-testid="notice-fallback"><strong>{COPY.jobs.scoredWithoutAgent}.</strong> Results come from our built-in scorer.</p>}
@@ -345,7 +360,8 @@ function JobCard({ it, selected, onSelect, onToggleSave, onRead }: { it: Item; s
         {stale && <strong style={{ color: "var(--unverified-ink)" }}> {COPY.jobs.stale}</strong>}
       </p>
       <div className="row" style={{ gap: 8 }}>
-        <button className="btn btn-secondary btn-sm" type="button" aria-pressed={it.saved} onClick={onToggleSave}><Icon name="bookmark" size={18} filled={it.saved} />{it.saved ? "Saved" : "Save"}</button>
+        <button className="btn btn-secondary btn-sm" type="button" aria-pressed={it.saved} onClick={onToggleSave} data-voice-command={it.saved ? "off" : "on"}
+          data-voice-names={it.saved ? "unsave|remove from saved" : "save this job|bookmark"}><Icon name="bookmark" size={18} filled={it.saved} />{it.saved ? "Saved" : "Save"}</button>
         <button className="btn btn-secondary btn-sm" type="button" onClick={onRead}><Icon name="volume" size={18} />Read aloud</button>
         {it.job.accommodationForm ? (
           <a className="btn btn-secondary btn-sm" href={it.job.accommodationForm.url} target="_blank" rel="noopener noreferrer">
@@ -368,6 +384,13 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
   const { prefs } = usePrefs();
   const [full, setFull] = useState(false);
   const reading = reader.jobId === jobId && reader.status !== "idle";
+  const aboutRef = useRef<HTMLDivElement>(null);
+  // Voice: the whole description, read aloud, without first finding the "full description" link.
+  useVoiceActions([
+    { names: ["Read the description", "read the full description", "read the job description", "read the whole description", "read the whole thing", "read me the job", "read this job"],
+      run: () => { if (!job) return; setFull(true); void reader.play(jobId, "full", job.descriptionText); },
+      anchor: () => aboutRef.current, message: "Reading the description. Say stop or pause any time.", when: () => !!job && !reading },
+  ]);
   if (!job) return <section className="jobs-col detail panel" aria-busy="true" role="status">Loading job…</section>;
 
   const codes = [...new Set([...required, ...preferred, ...job.accommodations.map((a) => a.code)])] as (typeof ACCOMMODATION_CODES)[number][];
@@ -381,7 +404,7 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
 
   return (
     <section id="detail" aria-labelledby="detail-heading" className="jobs-col detail panel stack" style={{ padding: 26, gap: 18 }}
-      data-voice-names={`${job.title} at ${job.employer?.name ?? ""}|job details`}>
+      data-voice-names={`${job.title} at ${job.employer?.name ?? ""}|job details|this job|the open job`} data-voice-primary>
       <div className="stack" style={{ gap: 6 }}>
         {job.isDemo && <div className="row small muted" style={{ gap: 8 }}><span className="demo">DEMO</span>{COPY.common.demoNote}</div>}
         <h2 id="detail-heading" tabIndex={-1} style={{ margin: 0, fontSize: "1.65rem", lineHeight: 1.2 }}>{job.title}</h2>
@@ -393,9 +416,13 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
         </div>
       </div>
       <div className="row">
-        <Link className="btn btn-primary btn-lg" to={`/jobs/${jobId}/email`} style={{ minHeight: 52 }}>Request accommodations and apply</Link>
-        <button className="btn btn-secondary" type="button" aria-pressed={item.saved} onClick={onToggleSave}><Icon name="bookmark" size={18} filled={item.saved} />{item.saved ? "Saved" : "Save"}</button>
-        <Link className="btn btn-secondary" to={`/jobs/${jobId}/practice`}><Icon name="mic" size={18} />{COPY.practice.entry}</Link>
+        <Link className="btn btn-primary btn-lg" to={`/jobs/${jobId}/email`} style={{ minHeight: 52 }}
+          data-voice-names="apply|apply for this job|request accommodations|ask for accommodations|accommodation email|email the employer|write the email|draft an email"
+          data-voice-say="Here's the accommodation email for this job. Choose what to ask for, then I can write the draft.">Request accommodations and apply</Link>
+        <button className="btn btn-secondary" type="button" aria-pressed={item.saved} onClick={onToggleSave} data-voice-command={item.saved ? "off" : "on"}
+          data-voice-names={item.saved ? "saved|unsave this job|remove from saved" : "save this job|save job|bookmark|bookmark this job"}
+          data-voice-say={item.saved ? "Removed from your saved jobs." : "Saved. It's in your application tracker."}><Icon name="bookmark" size={18} filled={item.saved} />{item.saved ? "Saved" : "Save"}</button>
+        <Link className="btn btn-secondary" to={`/jobs/${jobId}/practice`} data-voice-names="practice interview|interview practice|mock interview|practice for this job|rehearse" data-voice-say="Here's the practice interview for this job. Say start when you're ready."><Icon name="mic" size={18} />{COPY.practice.entry}</Link>
       </div>
 
       {job.accommodationForm ? (
@@ -413,7 +440,7 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
         </div>
       )}
 
-      <div className="stack" style={{ gap: 10 }}>
+      <div className="stack" style={{ gap: 10 }} ref={aboutRef} data-voice-names="about the role|job summary">
         <h3 style={{ margin: 0, fontSize: "1.12rem" }}>About the role</h3>
         <div className="row" style={{ justifyContent: "space-between", padding: "10px 14px", borderRadius: 12, background: "var(--ground)", border: "1px solid var(--line)" }}>
           {reading ? (
@@ -422,15 +449,16 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
                 <Icon name="volume" size={18} />{reader.status === "loading" ? "Preparing audio…" : reader.notice || COPY.tts.reading}
               </span>
               <span className="row" style={{ gap: 6 }}>
-                {reader.status === "playing" && <button className="btn btn-secondary btn-sm" type="button" onClick={reader.pause}>Pause</button>}
-                {reader.status === "paused" && <button className="btn btn-secondary btn-sm" type="button" onClick={reader.resume}>Resume</button>}
-                <button className="btn btn-secondary btn-sm" type="button" onClick={reader.stop}>Stop</button>
+                {reader.status === "playing" && <button className="btn btn-secondary btn-sm" type="button" onClick={reader.pause} data-voice-command data-voice-names="pause reading|pause|hold on|wait">Pause</button>}
+                {reader.status === "paused" && <button className="btn btn-secondary btn-sm" type="button" onClick={reader.resume} data-voice-command data-voice-names="resume|continue|continue reading|keep reading|keep going">Resume</button>}
+                <button className="btn btn-secondary btn-sm" type="button" onClick={reader.stop} data-voice-command data-voice-names="stop reading|stop|be quiet|quiet|silence|that's enough">Stop</button>
               </span>
             </>
           ) : (
             <>
               <span className="small muted">{reader.notice && reader.jobId === null ? reader.notice : "Hear this description read aloud with each word highlighted."}</span>
-              <button className="btn btn-secondary btn-sm" type="button" onClick={() => void reader.play(jobId, full || prefs.voiceReader ? "full" : "summary", readText)}>
+              <button className="btn btn-secondary btn-sm" type="button" onClick={() => void reader.play(jobId, full || prefs.voiceReader ? "full" : "summary", readText)}
+                data-voice-command data-voice-names="read aloud|read it aloud|read the summary|listen">
                 <Icon name="volume" size={18} />Read aloud
               </button>
             </>
@@ -446,7 +474,9 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
         ) : (
           <p style={{ margin: 0, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{summary}</p>
         )}
-        <button type="button" className="btn-link" aria-expanded={full} onClick={() => setFull((x) => !x)} style={{ alignSelf: "flex-start" }}>
+        <button type="button" className="btn-link" aria-expanded={full} onClick={() => setFull((x) => !x)} style={{ alignSelf: "flex-start" }}
+          data-voice-command data-voice-label={full ? "Show the summary only" : "Show the full description"}
+          data-voice-names={full ? "show less|collapse the description|shorter" : "show more|expand the description|more details|show the whole description"}>
           {full ? "Show summary" : "Read full description"}
         </button>
       </div>
@@ -485,7 +515,7 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
       </div>
       <p className="small muted" style={{ margin: 0 }}>
         Source: {sourceName(job.source)} · checked {timeAgo(job.fetchedAt)} ·{" "}
-        <a href={job.applyUrl} target="_blank" rel="noopener noreferrer">Open the employer's application page<span className="sr-only"> (opens in a new tab)</span></a>
+        <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" data-voice-confirm data-voice-names="employer's website|employer site|job posting|original posting|apply on their site">Open the employer's application page<span className="sr-only"> (opens in a new tab)</span></a>
       </p>
       <LabelLegend />
     </section>
@@ -500,7 +530,7 @@ function EmployerFormCallout({ form, employer, jobId }: { form: { url: string; q
         <strong>{COPY.email.formTitle(employer)}</strong>
         <blockquote className="quote small">Listing says: "{form.quote}"</blockquote>
         <span className="row" style={{ gap: 8 }}>
-          <a className="btn btn-primary btn-sm" href={form.url} target="_blank" rel="noopener noreferrer">
+          <a className="btn btn-primary btn-sm" href={form.url} target="_blank" rel="noopener noreferrer" data-voice-confirm data-voice-names="accommodation form|employer's form|their form">
             {COPY.email.formOpen}<Icon name="external" size={16} /><span className="sr-only"> (opens in a new tab)</span>
           </a>
           <Link className="btn btn-secondary btn-sm" to={`/jobs/${jobId}/email`}>Draft an email instead</Link>
@@ -513,7 +543,7 @@ function EmployerFormCallout({ form, employer, jobId }: { form: { url: string; q
 function LabelLegend() {
   return (
     <details>
-      <summary className="small" style={{ cursor: "pointer", fontWeight: 600, minHeight: 44, display: "flex", alignItems: "center" }}>What the labels mean</summary>
+      <summary className="small" style={{ cursor: "pointer", fontWeight: 600, minHeight: 44, display: "flex", alignItems: "center" }} data-voice-command data-voice-names="label legend|what do the labels mean|explain the labels">What the labels mean</summary>
       <dl className="small" style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 12px", alignItems: "start" }}>
         <dt><LabelBadge info={{ label: "stated" }} /></dt><dd style={{ margin: 0 }}>The listing itself says it. We show its exact words.</dd>
         <dt><LabelBadge info={{ label: "verified" }} /></dt><dd style={{ margin: 0 }}>Our team confirmed it from an employer source.</dd>

@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { errorBody } from "./lib/errors";
+import * as voiceAgent from "./ai/voiceAgentHttp";
 
 const VERSION = "0.1.0";
 const http = httpRouter();
@@ -66,6 +67,10 @@ http.route({
     }
   }),
 });
+
+// Voice assistant: streamed replies (convex/ai/voiceAgentHttp.ts).
+http.route({ path: "/voice/agent", method: "POST", handler: voiceAgent.reply });
+http.route({ path: "/voice/agent", method: "OPTIONS", handler: voiceAgent.preflight });
 
 for (const path of ["/health", "/agent/claim", "/agent/result"]) {
   http.route({ path, method: "OPTIONS", handler: httpAction(async () => new Response(null, { status: 204 })) });

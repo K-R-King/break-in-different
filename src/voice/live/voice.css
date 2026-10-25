@@ -66,6 +66,9 @@ html[data-reduce-motion="true"] .voice-meter > span { transition: none; }
   transition: top 120ms ease-out, left 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
 }
 .voice-hl[data-state="unsure"] { border-style: dotted; }
+/* A low-stakes guess while words arrive: fainter, so it reads as "maybe". */
+.voice-hl[data-state="hint"] { border-width: 2px; background: transparent; box-shadow: 0 0 0 2px var(--surface); opacity: 0.75; }
+.voice-hl[data-state="hint"] .voice-hl-tag { background: var(--surface); color: var(--voice-strong); border: 1px solid var(--voice); }
 .voice-hl[data-state="doing"], .voice-hl[data-state="done"] { border-style: solid; background: rgba(21, 128, 61, 0.12); }
 .voice-hl[data-fading] { animation: voice-hl-out 1.2s ease-in forwards; }
 @keyframes voice-hl-out { from { opacity: 1; } to { opacity: 0; } }
