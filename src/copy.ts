@@ -193,6 +193,7 @@ export const COPY = {
     whichOne: (a: string, b: string) => `"${a}" or "${b}"? Say which one.`,
     newTabBlocked: (name: string) =>
       `The browser blocked the new tab for ${name}. Press Enter to open it, or allow pop-ups for this site so voice can open links.`,
+    filePickerBlocked: "Press Enter to pick the file. The browser only opens the file picker from a key press or click.",
   },
   tts: {
     browserVoice: "Using your browser's voice",

@@ -95,12 +95,44 @@ function dialogTitle(d: Element): string {
   return (d.getAttribute("aria-label") || (by && document.getElementById(by)?.textContent) || "").trim();
 }
 
-function press(t: Target): Outcome {
+// Clicks el, noting whether that tried to open a file picker (a button that clicks a hidden file
+// input). Browsers show the picker only after the person's own click or key press.
+function clickNotingFilePicker(el: HTMLElement): boolean {
+  let picker = el instanceof HTMLInputElement && el.type === "file";
+  const proto = HTMLInputElement.prototype;
+  const click = proto.click;
+  proto.click = function (this: HTMLInputElement) {
+    if (this.type === "file") picker = true;
+    click.call(this);
+  };
+  try {
+    el.click();
+  } finally {
+    proto.click = click;
+  }
+  return picker;
+}
+
+// Error messages on the page, by text: a press that only showed one did not do what it says.
+const ERRORS = '[role="alert"], .callout-error, .field-error';
+const errorTexts = () => new Set([...document.querySelectorAll(ERRORS)].map((e) => e.textContent?.trim() ?? "").filter(Boolean));
+
+async function press(t: Target): Promise<Outcome> {
   const a = t.el;
   if (t.kind === "link" && a instanceof HTMLAnchorElement && a.target === "_blank" && a.href) return openNewTab(t, a);
   const before = new Set(document.querySelectorAll("dialog[open]"));
-  a.click();
+  const errorsBefore = errorTexts();
+  // A voice command has no click or key press behind it, so the file picker stays shut: focus the
+  // control, and Enter opens it.
+  if (clickNotingFilePicker(a) && !navigator.userActivation?.isActive) {
+    a.focus({ preventScroll: true });
+    return { changed: false, message: COPY.voice.filePickerBlocked, el: a };
+  }
   if (t.kind === "link") return { changed: true, message: `Opened ${linkName(t.label)}.`, el: a };
+  // The press only showed an error ("Tick the consent box first"): say that instead.
+  await frame();
+  const error = [...errorTexts()].find((e) => !errorsBefore.has(e));
+  if (error) return { changed: false, message: /[.?!]$/.test(error) ? error : `${error}.`, el: a };
   // A button that only opens a dialog ("Delete all my data" asks first): say what opened, not
   // that the action was done.
   const opened = [...document.querySelectorAll("dialog[open]")].find((d) => !before.has(d));

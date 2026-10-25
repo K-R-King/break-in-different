@@ -159,6 +159,30 @@ describe("execute", () => {
       expect((await execute(t, "press")).message).toBe("Delete all your data?");
       dlg.remove();
     });
+    it("a button that opens a file picker is focused for Enter, since the browser needs a key press", async () => {
+      const t = button("Choose a PDF");
+      const file = document.createElement("input");
+      file.type = "file";
+      document.body.append(file);
+      t.el.addEventListener("click", () => file.click());
+      const out = await execute(t, "press");
+      expect(out.changed).toBe(false);
+      expect(document.activeElement).toBe(t.el);
+      expect(out.message).toMatch(/Press Enter to pick the file/);
+      expect(HTMLInputElement.prototype.click.name).toBe("click"); // put back as it was
+    });
+    it("a press that only shows an error says the error, not that it was done", async () => {
+      const t = button("Choose a PDF");
+      const err = document.createElement("div");
+      err.className = "callout callout-error";
+      document.body.append(err);
+      t.el.addEventListener("click", () => (err.textContent = "Tick the consent box first, or add skills by hand."));
+      const out = await execute(t, "press");
+      expect(out.changed).toBe(false);
+      expect(out.message).toBe("Tick the consent box first, or add skills by hand.");
+      err.remove();
+    });
+
     it("switches say turned on or off, without a colon", async () => {
       expect((await execute(checkbox(false), "on")).message).toBe("Turned on Reduce motion.");
       expect((await execute(checkbox(true), "on")).message).toBe("Reduce motion is already on.");

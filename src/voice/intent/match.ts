@@ -375,12 +375,13 @@ export function bestMatch(text: string, candidates: Candidate[], opts: MatchOpti
   for (const w of here) explained.add(w);
   const share = words.length ? words.filter((w) => explained.has(w)).length / words.length : 1;
   // An action word that starts the control's own name is the verb: "refresh the matches" presses
-  // "Refresh matches", "save" presses "Save". It is a request, so it is done, not asked about.
+  // "Refresh matches", "save" presses "Save", "choose a PDF" presses "Choose a PDF". It is a
+  // request, so it is done, not asked about.
+  const lead = tokens(text)[0];
   const leads =
-    verb === null &&
+    (verb === null ? ACTIONS.has(lead) : verb === "select") &&
     (top.c.kind === "button" || top.c.kind === "link") &&
-    ACTIONS.has(words[0]) &&
-    top.c.names.some((n) => tokens(n)[0] === words[0]);
+    top.c.names.some((n) => tokens(n)[0] === lead);
   return {
     id: top.c.id,
     verb: leads ? (top.c.kind === "link" ? "go" : "press") : verb,

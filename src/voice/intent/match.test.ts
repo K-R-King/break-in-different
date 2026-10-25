@@ -191,6 +191,10 @@ describe("action words in a control's name", () => {
     expect(bestMatch("Refresh.", c)).toMatchObject({ id: 1, verb: "press" });
     expect(bestMatch("save my profile", c)).toMatchObject({ id: 2, verb: "press" });
   });
+  it("a verb that starts a button's name presses it", () => {
+    const pdf: Candidate[] = [...c, { id: 6, kind: "button", names: ["Choose a PDF", "upload resume"] }];
+    expect(bestMatch("choose a PDF", pdf)).toMatchObject({ id: 6, verb: "press" });
+  });
   it("a name that is not an action only selects", () => {
     expect(bestMatch("settings", c)).toMatchObject({ id: 3, verb: null });
     expect(bestMatch("matches", c)).toMatchObject({ id: 1, verb: null });
