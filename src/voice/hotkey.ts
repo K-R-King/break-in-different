@@ -14,15 +14,16 @@ export interface VoiceKey {
   mode: TalkMode;
 }
 
-export const DEFAULT_VOICE_KEY: VoiceKey = {
-  combo: { code: "Space", ctrl: true, alt: false, shift: false, meta: false },
-  mode: "hold",
-};
+export const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+// Cmd+/ on a Mac, Ctrl+/ on Windows and Linux.
+export const defaultCombo = (mac = isMac()): Combo => ({ code: "Slash", ctrl: !mac, alt: false, shift: false, meta: mac });
+
+// Press once to start listening and again to stop.
+export const DEFAULT_VOICE_KEY: VoiceKey = { combo: defaultCombo(), mode: "toggle" };
 
 const STORAGE_KEY = "bid.voiceKey";
 const MODIFIER_CODES = /^(Control|Alt|Shift|Meta|OS)(Left|Right)?$/;
-
-export const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 export function isModifierCode(code: string): boolean {
   return MODIFIER_CODES.test(code);
@@ -91,7 +92,7 @@ export function readVoiceKey(): VoiceKey {
     const v = JSON.parse(raw) as Partial<VoiceKey>;
     const c = v.combo;
     if (!c || typeof c.code !== "string" || comboProblem(c)) return DEFAULT_VOICE_KEY;
-    return { combo: { code: c.code, ctrl: !!c.ctrl, alt: !!c.alt, shift: !!c.shift, meta: !!c.meta }, mode: v.mode === "toggle" ? "toggle" : "hold" };
+    return { combo: { code: c.code, ctrl: !!c.ctrl, alt: !!c.alt, shift: !!c.shift, meta: !!c.meta }, mode: v.mode === "hold" ? "hold" : "toggle" };
   } catch {
     return DEFAULT_VOICE_KEY;
   }

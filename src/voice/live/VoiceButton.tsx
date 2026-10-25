@@ -17,7 +17,7 @@ const LABELS = [COPY.voice.button, COPY.voice.stopListening, COPY.voice.connecti
 // out when listening ends. Under it, two rows: what the person is saying (or a prompt to start),
 // and the assistant's reply (or a shimmering "Listening…" / "Thinking…"). Both reset when the
 // person speaks again.
-// The shortcut is the one set in Accessibility settings (default Ctrl+Space): in "hold" mode, talk
+// The shortcut is the one set in Accessibility settings (default Cmd+/ on a Mac, Ctrl+/ elsewhere): in "hold" mode, talk
 // while holding it; in "toggle" mode, press once to start and again to stop. Enter or Space on the
 // focused button also toggles it.
 export function VoiceButton() {

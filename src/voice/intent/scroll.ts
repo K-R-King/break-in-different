@@ -53,9 +53,27 @@ function scroller(from: Element | null): HTMLElement | null {
   return null;
 }
 
+// A layout of scrolling columns (Jobs: filters, list, details; Profile: the form) does not scroll
+// the window. Then the column holding the page's main region scrolls, else the largest one on screen.
+function mainScroller(): HTMLElement | null {
+  const root = document.scrollingElement ?? document.documentElement;
+  if (root.scrollHeight > root.clientHeight + 1 && getComputedStyle(document.body).overflowY !== "hidden") return null;
+  const primary = scroller(document.querySelector("[data-voice-primary]"));
+  if (primary) return primary;
+  let best: HTMLElement | null = null;
+  let most = 0;
+  for (const el of document.body.querySelectorAll<HTMLElement>("*")) {
+    if (el.scrollHeight <= el.clientHeight + 1 || !/^(auto|scroll)$/.test(getComputedStyle(el).overflowY)) continue;
+    const r = el.getBoundingClientRect();
+    const area = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) * Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+    if (area > most) [best, most] = [el, area];
+  }
+  return best;
+}
+
 export function scrollPage(cmd: ScrollCommand, near: Element | null): string {
   const dialog = document.querySelector("dialog[open]");
-  const box = scroller(near) ?? (dialog ? (scroller(dialog.firstElementChild) ?? (dialog as HTMLElement)) : null);
+  const box = scroller(near) ?? (dialog ? (scroller(dialog.firstElementChild) ?? (dialog as HTMLElement)) : mainScroller());
   const behavior: ScrollBehavior = reducedMotion() ? "auto" : "smooth";
   const view = visibleArea(box, null);
   const top = cmd.amount === "end" ? (cmd.dir < 0 ? 0 : Number.MAX_SAFE_INTEGER) : undefined;

@@ -177,3 +177,46 @@ describe("looseGuess", () => {
     expect(looseGuess("voice controls wait reader", c)).toBe(2);
   });
 });
+
+describe("simple: only the control's own name, so it is done locally", () => {
+  const c: Candidate[] = [
+    { id: 1, kind: "group", names: ["Remote work options"] },
+    { id: 2, kind: "radio", names: ["Not needed"], parent: 1 },
+    { id: 3, kind: "button", names: ["Refresh matches"] },
+  ];
+  it("a name, maybe with a verb, is simple", () => {
+    expect(bestMatch("refresh the matches", c)?.simple).toBe(true);
+    expect(m("turn on reduce motion")?.simple).toBe(true);
+    expect(m("go to my profile")?.simple).toBe(true);
+  });
+  it("anything said in context is not, so the assistant interprets it", () => {
+    expect(bestMatch("Remote work options should be Not needed", c)).toMatchObject({ id: 2, simple: false });
+  });
+});
+
+describe("action words in a control's name", () => {
+  const c: Candidate[] = [
+    { id: 1, kind: "button", names: ["Refresh matches"] },
+    { id: 2, kind: "button", names: ["Save", "save profile"] },
+    { id: 3, kind: "button", names: ["Accessibility settings", "settings"] },
+    { id: 4, kind: "text", names: ["Add a skill"] },
+    { id: 5, kind: "button", names: ["Add skill"] },
+  ];
+  it("are the verb: saying one is a request to do it", () => {
+    expect(bestMatch("refresh the matches", c)).toMatchObject({ id: 1, verb: "press", confident: true });
+    expect(bestMatch("Refresh.", c)).toMatchObject({ id: 1, verb: "press" });
+    expect(bestMatch("save my profile", c)).toMatchObject({ id: 2, verb: "press" });
+  });
+  it("a verb that starts a button's name presses it", () => {
+    const pdf: Candidate[] = [...c, { id: 6, kind: "button", names: ["Choose a PDF", "upload resume"] }];
+    expect(bestMatch("choose a PDF", pdf)).toMatchObject({ id: 6, verb: "press" });
+  });
+  it("a name that is not an action only selects", () => {
+    expect(bestMatch("settings", c)).toMatchObject({ id: 3, verb: null });
+    expect(bestMatch("matches", c)).toMatchObject({ id: 1, verb: null });
+  });
+  it("still leaves a text box to type in when its name says so", () => {
+    expect(bestMatch("add a skill", c)).toMatchObject({ id: 4, verb: null });
+  });
+});
+

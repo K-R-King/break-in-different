@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { execute } from "./execute";
 import type { Target } from "./scan";
 
@@ -37,7 +37,7 @@ describe("execute", () => {
     expect(out.changed).toBe(false);
     expect(on(t)).toBe(false);
     expect(document.activeElement).toBe(t.el);
-    expect(out.message).toMatch(/Reduce motion: off/);
+    expect(out.message).toMatch(/Reduce motion is off/);
   });
 
   it("never presses a dangerous control", async () => {
@@ -79,4 +79,114 @@ describe("execute", () => {
     await execute({ ...save, commandWay: "off" }, null);
     expect(el.getAttribute("aria-pressed")).toBe("false");
   });
+
+  describe("links", () => {
+    afterEach(() => vi.restoreAllMocks());
+    const link = (label: string, newTab: boolean): Target => {
+      const el = document.createElement("a");
+      el.href = "https://employer.example/apply";
+      if (newTab) el.target = "_blank";
+      el.textContent = label;
+      document.body.append(el);
+      return { id: 0, kind: "link", names: [label], label, el };
+    };
+
+    it("opens a new-tab link itself, since browsers block a scripted click, and still runs its handler", async () => {
+      const tab = { opener: window } as unknown as Window;
+      const open = vi.spyOn(window, "open").mockReturnValue(tab);
+      const t = link("Open application page", true);
+      let handled = false;
+      let followed = true;
+      t.el.addEventListener("click", (e) => {
+        handled = true;
+        queueMicrotask(() => (followed = !e.defaultPrevented));
+      });
+      const out = await execute(t, "go");
+      await Promise.resolve();
+      expect(handled).toBe(true);
+      expect(followed).toBe(false); // the blocked native click is not attempted as well
+      expect(open).toHaveBeenCalledWith("https://employer.example/apply", "_blank");
+      expect(tab.opener).toBeNull();
+      expect(out.message).toBe("Opened application page in a new tab.");
+    });
+
+    it("never leaves this page when the browser blocks the new tab: focuses the link for Enter", async () => {
+      vi.spyOn(window, "open").mockReturnValue(null);
+      const t = link("Open application page", true);
+      let clicked = false;
+      t.el.addEventListener("click", () => (clicked = true));
+      const out = await execute(t, "go");
+      expect(clicked).toBe(false); // its handler would think the person left for the employer's site
+      expect(out.changed).toBe(false);
+      expect(document.activeElement).toBe(t.el);
+      expect(out.message).toMatch(/blocked the new tab for application page\. Press Enter/);
+    });
+
+    it("never says the verb twice, and clicks same-tab links as usual", async () => {
+      const open = vi.spyOn(window, "open");
+      const t = link("Go to profile", false);
+      let clicked = false;
+      t.el.addEventListener("click", (e) => {
+        clicked = true;
+        e.preventDefault(); // jsdom cannot navigate
+      });
+      const out = await execute(t, "go");
+      expect(clicked).toBe(true);
+      expect(open).not.toHaveBeenCalled();
+      expect(out.message).toBe("Opened profile.");
+    });
+  });
+
+  describe("replies say what was done", () => {
+    const button = (label: string): Target => {
+      const el = document.createElement("button");
+      el.textContent = label;
+      document.body.append(el);
+      return { id: 0, kind: "button", names: [label], label, el };
+    };
+    it("in the button's own words", async () => {
+      expect((await execute(button("Refresh matches"), "press")).message).toBe("Refreshed matches.");
+      expect((await execute(button("Save"), "press")).message).toBe("Saved.");
+      expect((await execute(button("Next question"), "press")).message).toBe("Pressed Next question.");
+    });
+    it("a button that only opens a dialog says what opened, not that it was done", async () => {
+      const t = button("Delete all my data");
+      const dlg = document.createElement("dialog");
+      dlg.innerHTML = '<h2 id="del-title">Delete all your data?</h2>';
+      dlg.setAttribute("aria-labelledby", "del-title");
+      document.body.append(dlg);
+      t.el.addEventListener("click", () => dlg.setAttribute("open", ""));
+      expect((await execute(t, "press")).message).toBe("Delete all your data?");
+      dlg.remove();
+    });
+    it("a button that opens a file picker is focused for Enter, since the browser needs a key press", async () => {
+      const t = button("Choose a PDF");
+      const file = document.createElement("input");
+      file.type = "file";
+      document.body.append(file);
+      t.el.addEventListener("click", () => file.click());
+      const out = await execute(t, "press");
+      expect(out.changed).toBe(false);
+      expect(document.activeElement).toBe(t.el);
+      expect(out.message).toMatch(/Press Enter to pick the file/);
+      expect(HTMLInputElement.prototype.click.name).toBe("click"); // put back as it was
+    });
+    it("a press that only shows an error says the error, not that it was done", async () => {
+      const t = button("Choose a PDF");
+      const err = document.createElement("div");
+      err.className = "callout callout-error";
+      document.body.append(err);
+      t.el.addEventListener("click", () => (err.textContent = "Tick the consent box first, or add skills by hand."));
+      const out = await execute(t, "press");
+      expect(out.changed).toBe(false);
+      expect(out.message).toBe("Tick the consent box first, or add skills by hand.");
+      err.remove();
+    });
+
+    it("switches say turned on or off, without a colon", async () => {
+      expect((await execute(checkbox(false), "on")).message).toBe("Turned on Reduce motion.");
+      expect((await execute(checkbox(true), "on")).message).toBe("Reduce motion is already on.");
+    });
+  });
 });
+

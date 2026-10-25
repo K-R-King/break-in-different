@@ -185,12 +185,15 @@ export const COPY = {
     stopListening: "Stop listening",
     clickToStop: (key: string) => `Click, or press ${key}, to stop listening.`,
     clickToStart: (key: string) => `Click, or press ${key}, to start voice control. Escape stops it.`,
-    chosen: (where: string | undefined, name: string) => (where ? `${where}: ${name}.` : `${name}.`),
+    chosen: (where: string | undefined, name: string) => (where ? `Set ${where} to ${name}.` : `${name}.`),
     typing: (field: string) => `Typing in ${field}`,
     typed: (text: string) => `Typed "${text}".`,
     whichPlace: (name: string, places: string[]) =>
       places.length ? `"${name}" for which one: ${places.slice(0, 3).join(", ")}${places.length > 3 ? ", or another" : ""}?` : `Which "${name}"?`,
     whichOne: (a: string, b: string) => `"${a}" or "${b}"? Say which one.`,
+    newTabBlocked: (name: string) =>
+      `The browser blocked the new tab for ${name}. Press Enter to open it, or allow pop-ups for this site so voice can open links.`,
+    filePickerBlocked: "Press Enter to pick the file. The browser only opens the file picker from a key press or click.",
   },
   tts: {
     browserVoice: "Using your browser's voice",

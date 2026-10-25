@@ -124,7 +124,7 @@ export function SettingsDialog() {
           <fieldset style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
             <legend style={{ paddingTop: 8 }}>Reading and voice</legend>
             <Toggle label="Read aloud with word highlighting" checked={prefs.ttsHighlight} onChange={(v) => update({ ttsHighlight: v })} />
-            <Toggle label="Voice control (hold to talk)" checked={prefs.voiceNav} onChange={(v) => update({ voiceNav: v })} />
+            <Toggle label="Voice control" checked={prefs.voiceNav} onChange={(v) => update({ voiceNav: v })} />
             <Toggle label="Reduce motion" checked={prefs.reduceMotion} onChange={(v) => update({ reduceMotion: v })} />
           </fieldset>
 
@@ -149,7 +149,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-// "Hold to talk" shortcut: record a new combo, pick hold or toggle, reset. Saved on this device.
+// Voice control shortcut: record a new combo, pick toggle or hold, reset. Saved on this device.
 function VoiceShortcutSettings() {
   const { combo, mode } = useVoiceKey();
   const [recording, setRecording] = useState(false);
@@ -168,7 +168,7 @@ function VoiceShortcutSettings() {
 
   return (
     <fieldset style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-      <legend style={{ paddingTop: 8 }}>Hold to talk</legend>
+      <legend style={{ paddingTop: 8 }}>Voice control shortcut</legend>
       <div className="stack" style={{ gap: 12 }}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
           <span>
@@ -218,7 +218,7 @@ function VoiceShortcutSettings() {
           )}
         </div>
         <div className="stack" style={{ gap: 8 }}>
-          {([["hold", "Hold the keys while you talk"], ["toggle", "Press once to start, press again to stop"]] as const).map(([m, label]) => (
+          {([["toggle", "Press once to start, press again to stop"], ["hold", "Hold the keys while you talk"]] as const).map(([m, label]) => (
             <label key={m} className="check" style={{ alignItems: "center", padding: "8px 14px" }}>
               <input type="radio" name="talk-mode" checked={mode === m} onChange={() => setVoiceKey({ combo, mode: m })} />
               {label}
@@ -227,7 +227,7 @@ function VoiceShortcutSettings() {
         </div>
         <button className="btn btn-secondary btn-sm" type="button" disabled={isDefault} style={{ alignSelf: "flex-start" }}
           onClick={() => { setVoiceKey(DEFAULT_VOICE_KEY); setProblem(""); changeRef.current?.focus(); }}>
-          Reset shortcut to {formatCombo(DEFAULT_VOICE_KEY.combo)}, hold
+          Reset shortcut to {formatCombo(DEFAULT_VOICE_KEY.combo)}, press to start and stop
         </button>
       </div>
     </fieldset>

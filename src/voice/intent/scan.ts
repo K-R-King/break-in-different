@@ -27,8 +27,9 @@ export interface Target extends Candidate {
   label: string; // the name shown and spoken
 }
 
+// A file input out of the tab order is worked by a visible button ("Choose a PDF"), not directly.
 const CONTROLS =
-  'a[href], button, summary, input:not([type="hidden"]), select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"]';
+  'a[href], button, summary, input:not([type="hidden"]):not([type="file"][tabindex="-1"]), select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"]';
 const GROUPS =
   'fieldset, [role="group"], [role="region"], [role="radiogroup"], aside, section, article, nav[aria-label], form, dialog, .panel, .card, [data-voice-names]:not(' + CONTROLS + ")";
 const SKIP = '[data-voice-ignore], .voice-wrap, .voice-hl-layer, [aria-hidden="true"], [inert]';
@@ -53,6 +54,9 @@ function byIds(ids: string | null): string {
     .map(textOf)
     .join(" ");
 }
+
+// The screen reader note on links that open a new tab: not part of the name people say or hear.
+const NEW_TAB = /\s*\(opens in a new (tab|window)\)/gi;
 
 function controlName(el: HTMLElement): string {
   if (el.dataset.voiceLabel) return el.dataset.voiceLabel;
@@ -84,7 +88,7 @@ function kindOf(el: HTMLElement): Kind {
     if (el.type === "checkbox") return "checkbox";
     if (el.type === "radio") return "radio";
     if (el.type === "range") return "range";
-    if (el.type === "submit" || el.type === "button" || el.type === "reset") return "button";
+    if (el.type === "submit" || el.type === "button" || el.type === "reset" || el.type === "file") return "button";
     return "text";
   }
   if (el instanceof HTMLTextAreaElement) return "text";
@@ -175,7 +179,7 @@ export function scanPage(root: ParentNode = document): Target[] {
   for (const el of root.querySelectorAll<HTMLElement>(CONTROLS)) {
     if ((el as HTMLButtonElement).disabled || el.getAttribute("aria-disabled") === "true") continue;
     // A control's label wraps it: reach the input through its own box, not the label's.
-    const name = controlName(el);
+    const name = controlName(el).replace(NEW_TAB, "");
     const alts = altNames(el);
     if (!name && !alts.length) continue;
     const r = reach(el);

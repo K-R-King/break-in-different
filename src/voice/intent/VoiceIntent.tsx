@@ -209,9 +209,10 @@ export function VoiceIntent() {
           reply(COPY.voice.chosen(where, t.label));
           return;
         }
-        // Approving, sending, opening the employer's site: always the person's own "yes".
-        const needsYes = line.type === "ask" || confirmOnly;
-        if (needsYes) {
+        // The assistant decides when to ask: for a control marked confirm (approving, sending,
+        // opening the employer's site) it asks unless the person plainly told it to do exactly that.
+        // A command is not confirmed a second time.
+        if (line.type === "ask") {
           // Spelled out for the next turn, so an answer like "flexible hours" is read against it.
           const where = t.parent !== undefined ? ` in "${targets[t.parent]?.label}"` : "";
           remember("assistant", `[proposed: ${line.verb ?? "select"} "${t.label}"${where}, waiting for yes or another choice]`);
@@ -395,16 +396,22 @@ export function VoiceIntent() {
         return;
       }
 
-      // The end of what they said. Certain and simple: act now, locally.
-      const needsUnderstanding = !m || !m.confident || answering || QUESTION.test(text) || TYPING.test(text);
-      if (m && !needsUnderstanding) {
+      // The end of what they said. Trivial (just a control's name, maybe with a verb) and certain:
+      // act now, locally. Anything said in context ("Remote work options should be Not needed")
+      // goes to the assistant.
+      const certain = !!m && m.confident && !answering && !QUESTION.test(text) && !TYPING.test(text);
+      const local = () => {
         remember("user", text);
-        return run(targets[m.id], m.verb, targets);
-      }
-      // Otherwise the assistant decides (it gets keyword matching's guesses as hints); without
-      // it, keyword matching asks. A predicted end starts the assistant early; a real one too.
+        run(targets[m!.id], m!.verb, targets);
+      };
+      if (certain && m!.simple) return local();
+      // Otherwise the assistant decides (it gets keyword matching's guesses as hints). Without it,
+      // a certain match is still done locally, and keyword matching asks about the rest. A
+      // predicted end starts the assistant early; a real one too.
       const guesses = m ? [m.id, ...(m.ambiguousWith !== undefined ? [m.ambiguousWith] : [])] : [];
-      if (agentAvailable()) return startAgent(text, targets, guesses, () => keywordFallback(text, targets, m, true), pendingProposal);
+      const fallback = () => (certain ? local() : keywordFallback(text, targets, m, true));
+      if (agentAvailable()) return startAgent(text, targets, guesses, fallback, pendingProposal);
+      if (certain) return local();
       keywordFallback(text, targets, m, definite);
     };
 

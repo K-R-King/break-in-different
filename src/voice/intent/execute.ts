@@ -9,7 +9,8 @@
 //   do      the default action of what is selected ("yes", "do it").
 //   none    select only: focus and highlight, change nothing. The person hears what it is and
 //           its state, and can then say "turn it on", "press it", "yes"...
-import type { Verb } from "./match";
+import { COPY } from "../../copy";
+import { ACTION_PAST, type Verb } from "./match";
 import type { Target } from "./scan";
 import { reveal } from "./scroll";
 
@@ -29,13 +30,13 @@ function describe(t: Target): string {
   const el = t.el;
   switch (t.kind) {
     case "checkbox":
-      return `${t.label}: ${isOn(el) ? "on" : "off"}. Say "turn on", "turn off" or "toggle".`;
+      return `${t.label} is ${isOn(el) ? "on" : "off"}. Say "turn on", "turn off" or "toggle".`;
     case "radio":
-      return `${t.label}: ${isOn(el) ? "selected" : "not selected"}.${isOn(el) ? "" : ` Say "select" to choose it.`}`;
+      return `${t.label} is ${isOn(el) ? "selected" : "not selected"}.${isOn(el) ? "" : ` Say "select" to choose it.`}`;
     case "link":
       return `${t.label}, link. Say "open" to go there.`;
     case "button":
-      return isToggleButton(el) ? `${t.label}: ${isOn(el) ? "on" : "off"}. Say "turn on" or "turn off".` : `${t.label}, button. Say "press" to use it.`;
+      return isToggleButton(el) ? `${t.label} is ${isOn(el) ? "on" : "off"}. Say "turn on" or "turn off".` : `${t.label}, button. Say "press" to use it.`;
     case "group":
       return `${t.label}.`;
     default:
@@ -58,12 +59,85 @@ function setState(t: Target, want: boolean): Outcome {
   if (now !== want) el.click();
   el.focus({ preventScroll: true });
   const word = t.kind === "radio" ? (want ? "selected" : "not selected") : want ? "on" : "off";
-  return { changed: now !== want, message: now === want ? `${t.label} is already ${word}.` : `${t.label}: ${word}.`, el };
+  const done = t.kind === "radio" ? `Selected ${t.label}.` : `Turned ${word} ${t.label}.`;
+  return { changed: now !== want, message: now === want ? `${t.label} is already ${word}.` : done, el };
 }
 
-function press(t: Target): Outcome {
-  t.el.click();
-  return { changed: true, message: t.kind === "link" ? `Opened ${t.label}.` : `Pressed ${t.label}.`, el: t.el };
+// "Open application page" is said as "Opened application page", not "Opened Open application page".
+const linkName = (label: string) => label.replace(/^(open|go to|visit|view|see|show)\s+/i, "") || label;
+
+// A link that opens a new tab: browsers block a scripted click without the person's own click or
+// key press, which a voice command never has. Open the tab directly; this works once pop-ups are
+// allowed for the site. If the browser blocks it, the link is focused so Enter opens it, and this
+// tab stays where it is.
+function openNewTab(t: Target, a: HTMLAnchorElement): Outcome {
+  const tab = window.open(a.href, "_blank");
+  if (!tab) {
+    a.focus({ preventScroll: true });
+    return { changed: false, message: COPY.voice.newTabBlocked(linkName(t.label)), el: a };
+  }
+  tab.opener = null;
+  // The link's own click handler still runs (it may note that the person left for the employer's site).
+  a.addEventListener("click", (e) => e.preventDefault(), { once: true });
+  a.click();
+  return { changed: true, message: `Opened ${linkName(t.label)} in a new tab.`, el: a };
+}
+
+// What was done, in the button's own words: "Refresh matches" → "Refreshed matches."
+function pressed(label: string): string {
+  const [first, ...rest] = label.split(" ");
+  const past = ACTION_PAST[first.toLowerCase()];
+  return past ? `${[past, ...rest].join(" ")}.` : `Pressed ${label}.`;
+}
+
+function dialogTitle(d: Element): string {
+  const by = d.getAttribute("aria-labelledby");
+  return (d.getAttribute("aria-label") || (by && document.getElementById(by)?.textContent) || "").trim();
+}
+
+// Clicks el, noting whether that tried to open a file picker (a button that clicks a hidden file
+// input). Browsers show the picker only after the person's own click or key press.
+function clickNotingFilePicker(el: HTMLElement): boolean {
+  let picker = el instanceof HTMLInputElement && el.type === "file";
+  const proto = HTMLInputElement.prototype;
+  const click = proto.click;
+  proto.click = function (this: HTMLInputElement) {
+    if (this.type === "file") picker = true;
+    click.call(this);
+  };
+  try {
+    el.click();
+  } finally {
+    proto.click = click;
+  }
+  return picker;
+}
+
+// Error messages on the page, by text: a press that only showed one did not do what it says.
+const ERRORS = '[role="alert"], .callout-error, .field-error';
+const errorTexts = () => new Set([...document.querySelectorAll(ERRORS)].map((e) => e.textContent?.trim() ?? "").filter(Boolean));
+
+async function press(t: Target): Promise<Outcome> {
+  const a = t.el;
+  if (t.kind === "link" && a instanceof HTMLAnchorElement && a.target === "_blank" && a.href) return openNewTab(t, a);
+  const before = new Set(document.querySelectorAll("dialog[open]"));
+  const errorsBefore = errorTexts();
+  // A voice command has no click or key press behind it, so the file picker stays shut: focus the
+  // control, and Enter opens it.
+  if (clickNotingFilePicker(a) && !navigator.userActivation?.isActive) {
+    a.focus({ preventScroll: true });
+    return { changed: false, message: COPY.voice.filePickerBlocked, el: a };
+  }
+  if (t.kind === "link") return { changed: true, message: `Opened ${linkName(t.label)}.`, el: a };
+  // The press only showed an error ("Tick the consent box first"): say that instead.
+  await frame();
+  const error = [...errorTexts()].find((e) => !errorsBefore.has(e));
+  if (error) return { changed: false, message: /[.?!]$/.test(error) ? error : `${error}.`, el: a };
+  // A button that only opens a dialog ("Delete all my data" asks first): say what opened, not
+  // that the action was done.
+  const opened = [...document.querySelectorAll("dialog[open]")].find((d) => !before.has(d));
+  const title = opened && dialogTitle(opened);
+  return { changed: true, message: title ? (/[.?!]$/.test(title) ? title : `${title}.`) : pressed(t.label), el: a };
 }
 
 export async function execute(t: Target, verb: Verb | null): Promise<Outcome> {
@@ -136,7 +210,7 @@ export function intentLabel(t: Target, verb: Verb | null): string {
     case "radio":
       return verb === "off" ? where : verb === "go" ? `Show: ${where}` : `Select: ${where}`;
     case "link":
-      return `Go to: ${where}`;
+      return `Go to: ${linkName(where)}`;
     case "button":
       return verb === "off" && isToggleButton(t.el) ? `Turn off: ${where}` : `Press: ${where}`;
     default:
