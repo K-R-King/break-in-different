@@ -28,6 +28,7 @@ export function VoiceButton() {
   const heard = v.status === "listening" && !v.muted;
   const shortcut = formatCombo(combo);
 
+  // While on, the button says what a click does (stop); the panel shows that it is listening.
   const label =
     v.status === "starting"
       ? COPY.voice.connecting
@@ -36,8 +37,9 @@ export function VoiceButton() {
         : v.status === "listening"
           ? v.muted
             ? COPY.voice.muted
-            : COPY.voice.listening
+            : COPY.voice.stopListening
           : COPY.voice.button;
+  const hint = on ? COPY.voice.clickToStop(shortcut) : COPY.voice.clickToStart(shortcut);
 
   // Keep the last words visible for a moment after listening ends.
   const [linger, setLinger] = useState(false);
@@ -192,7 +194,8 @@ export function VoiceButton() {
           data-state={v.status}
           data-heard={heard}
           data-testid="voice-button"
-          aria-pressed={on}
+          data-on={on}
+          title={hint}
           aria-describedby={descId}
           aria-keyshortcuts={[
             combo.ctrl && "Control",
@@ -205,13 +208,13 @@ export function VoiceButton() {
             .join("+")}
           onClick={v.toggle}
         >
-          <Icon name="mic" />
+          <Icon name={on ? "stop" : "mic"} filled={on} size={on ? 18 : 20} />
           {label}
           <kbd className="kbd">{shortcut}</kbd>
         </button>
       </div>
       <span id={descId} className="sr-only">
-        {COPY.voice.shortcut(shortcut)} {COPY.voice.privacy}
+        {hint} {COPY.voice.privacy}
       </span>
       {showPanel && (
         <div

@@ -21,8 +21,11 @@ html[data-contrast="high"] {
 .voice-dock[data-docked="true"] .voice-btn { box-shadow: 0 6px 22px rgba(20, 21, 26, 0.22); }
 .voice-btn { position: relative; transition: border-color 600ms ease-out, background-color 600ms ease-out, color 600ms ease-out; }
 /* Starting or reconnecting: green outline, no glow (nothing is being heard yet). */
-.voice-btn[aria-pressed="true"] { border-color: var(--voice); color: var(--voice-strong); background: var(--voice-bg); }
-.voice-btn[aria-pressed="true"]:not([data-heard="true"]) { border-style: dashed; }
+.voice-btn[data-on="true"] { border-color: var(--voice); color: var(--voice-strong); background: var(--voice-bg); }
+.voice-btn[data-on="true"]:not([data-heard="true"]) { border-style: dashed; }
+/* While on, it reads as a stop button: hovering or focusing makes that unmistakable. */
+.voice-btn[data-on="true"]:hover, .voice-btn[data-on="true"]:focus-visible { background: #dcfce7; border-color: var(--voice-strong); }
+html[data-contrast="high"] .voice-btn[data-on="true"]:hover { background: #ffffff; text-decoration: underline; }
 
 /* The glow lives on its own layer so it can fade out (glow down) when listening ends. */
 .voice-btn::after {
