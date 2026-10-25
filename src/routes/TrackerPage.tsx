@@ -27,17 +27,26 @@ export default function TrackerPage() {
   const [sort, setSort] = useState<"deadline" | "updated">("deadline");
   const [status, setStatus] = useState("");
 
+  // Rows are sorted when the page opens and when the sort changes, never because a row was edited:
+  // the order is kept by id, and jobs saved since go at the end.
+  const order = useRef<{ sort: string; ids: string[] }>({ sort: "", ids: [] });
   const sorted = useMemo(() => {
     const r = [...(rows ?? [])];
-    if (sort === "updated") r.sort((a, b) => b.updatedAt - a.updatedAt);
-    // Ties keep the order the jobs were saved in, so editing a row never moves it.
-    else r.sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"));
+    if (order.current.sort !== sort || !order.current.ids.length) {
+      if (sort === "updated") r.sort((a, b) => b.updatedAt - a.updatedAt);
+      else r.sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"));
+      order.current = { sort, ids: r.map((x) => x._id) };
+      return r;
+    }
+    const at = new Map(order.current.ids.map((id, i) => [id, i]));
+    r.sort((a, b) => (at.get(a._id) ?? Infinity) - (at.get(b._id) ?? Infinity));
+    order.current.ids = r.map((x) => x._id);
     return r;
   }, [rows, sort]);
 
   // Wide, tall-enough screens: the page stops scrolling and the table scrolls in its panel (styles in base.css).
   const tableRef = useRef<HTMLDivElement>(null);
-  useFitLayout(tableRef, { minWidth: 960, minHeight: 360, enabled: !!rows?.length });
+  useFitLayout(tableRef, { minWidth: 700, minHeight: 160, enabled: !!rows?.length });
 
   const counts = APPLICATION_STATUSES.map((s) => ({ s, n: (rows ?? []).filter((r) => r.status === s).length }));
 
