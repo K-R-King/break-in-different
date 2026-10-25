@@ -9,6 +9,7 @@
 //   do      the default action of what is selected ("yes", "do it").
 //   none    select only: focus and highlight, change nothing. The person hears what it is and
 //           its state, and can then say "turn it on", "press it", "yes"...
+import { COPY } from "../../copy";
 import type { Verb } from "./match";
 import type { Target } from "./scan";
 import { reveal } from "./scroll";
@@ -65,29 +66,27 @@ function setState(t: Target, want: boolean): Outcome {
 const linkName = (label: string) => label.replace(/^(open|go to|visit|view|see|show)\s+/i, "") || label;
 
 // A link that opens a new tab: browsers block a scripted click without the person's own click or
-// key press, which a voice command never has. Open the tab directly; if that is blocked too, follow
-// the link in this tab, so it still goes where the person asked.
-function openNewTab(a: HTMLAnchorElement): boolean {
+// key press, which a voice command never has. Open the tab directly; this works once pop-ups are
+// allowed for the site. If the browser blocks it, the link is focused so Enter opens it, and this
+// tab stays where it is.
+function openNewTab(t: Target, a: HTMLAnchorElement): Outcome {
+  const tab = window.open(a.href, "_blank");
+  if (!tab) {
+    a.focus({ preventScroll: true });
+    return { changed: false, message: COPY.voice.newTabBlocked(linkName(t.label)), el: a };
+  }
+  tab.opener = null;
   // The link's own click handler still runs (it may note that the person left for the employer's site).
   a.addEventListener("click", (e) => e.preventDefault(), { once: true });
   a.click();
-  const tab = window.open(a.href, "_blank");
-  if (tab) {
-    tab.opener = null;
-    return true;
-  }
-  window.location.assign(a.href);
-  return false;
+  return { changed: true, message: `Opened ${linkName(t.label)} in a new tab.`, el: a };
 }
 
 function press(t: Target): Outcome {
-  if (t.kind !== "link") {
-    t.el.click();
-    return { changed: true, message: `Pressed ${t.label}.`, el: t.el };
-  }
   const a = t.el;
-  const newTab = a instanceof HTMLAnchorElement && a.target === "_blank" && !!a.href ? openNewTab(a) : (a.click(), false);
-  return { changed: true, message: `Opened ${linkName(t.label)}${newTab ? " in a new tab" : ""}.`, el: a };
+  if (t.kind === "link" && a instanceof HTMLAnchorElement && a.target === "_blank" && a.href) return openNewTab(t, a);
+  a.click();
+  return { changed: true, message: t.kind === "link" ? `Opened ${linkName(t.label)}.` : `Pressed ${t.label}.`, el: a };
 }
 
 export async function execute(t: Target, verb: Verb | null): Promise<Outcome> {

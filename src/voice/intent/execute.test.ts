@@ -110,6 +110,18 @@ describe("execute", () => {
       expect(out.message).toBe("Opened application page in a new tab.");
     });
 
+    it("never leaves this page when the browser blocks the new tab: focuses the link for Enter", async () => {
+      vi.spyOn(window, "open").mockReturnValue(null);
+      const t = link("Open application page", true);
+      let clicked = false;
+      t.el.addEventListener("click", () => (clicked = true));
+      const out = await execute(t, "go");
+      expect(clicked).toBe(false); // its handler would think the person left for the employer's site
+      expect(out.changed).toBe(false);
+      expect(document.activeElement).toBe(t.el);
+      expect(out.message).toMatch(/blocked the new tab for application page\. Press Enter/);
+    });
+
     it("never says the verb twice, and clicks same-tab links as usual", async () => {
       const open = vi.spyOn(window, "open");
       const t = link("Go to profile", false);

@@ -191,6 +191,8 @@ export const COPY = {
     whichPlace: (name: string, places: string[]) =>
       places.length ? `"${name}" for which one: ${places.slice(0, 3).join(", ")}${places.length > 3 ? ", or another" : ""}?` : `Which "${name}"?`,
     whichOne: (a: string, b: string) => `"${a}" or "${b}"? Say which one.`,
+    newTabBlocked: (name: string) =>
+      `The browser blocked the new tab for ${name}. Press Enter to open it, or allow pop-ups for this site so voice can open links.`,
   },
   tts: {
     browserVoice: "Using your browser's voice",
