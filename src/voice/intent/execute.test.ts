@@ -48,4 +48,35 @@ describe("execute", () => {
     expect(clicked).toBe(false);
     expect(out.changed).toBe(false);
   });
+
+  it("runs a voice-only command when said", async () => {
+    let ran = 0;
+    const el = document.body;
+    const out = await execute({ id: 0, kind: "button", names: ["Next job"], label: "Next job", el, command: true, run: () => ran++, message: "Moved." }, null);
+    expect(ran).toBe(1);
+    expect(out).toMatchObject({ changed: true, message: "Moved." });
+  });
+
+  it("chooses a dropdown option only with a verb", async () => {
+    let ran = 0;
+    const el = document.body.appendChild(document.createElement("select"));
+    const t = { id: 0, kind: "radio" as const, names: ["Interviewing"], label: "Status: Interviewing", el, run: () => ran++ };
+    expect((await execute(t, null)).changed).toBe(false);
+    expect(ran).toBe(0);
+    await execute(t, "select");
+    expect(ran).toBe(1);
+  });
+
+  it("turns a toggle command only the way its name says", async () => {
+    const el = document.body.appendChild(document.createElement("button"));
+    el.setAttribute("aria-pressed", "false");
+    el.onclick = () => el.setAttribute("aria-pressed", String(el.getAttribute("aria-pressed") !== "true"));
+    const save = { id: 0, kind: "button" as const, names: ["Save this job"], label: "Save", el, command: true, commandWay: "on" as const };
+    await execute(save, null);
+    expect(el.getAttribute("aria-pressed")).toBe("true");
+    await execute(save, null); // saying "save" again never unsaves
+    expect(el.getAttribute("aria-pressed")).toBe("true");
+    await execute({ ...save, commandWay: "off" }, null);
+    expect(el.getAttribute("aria-pressed")).toBe("false");
+  });
 });

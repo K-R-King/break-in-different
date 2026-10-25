@@ -14,6 +14,7 @@ import { PageHeading, useDocumentTitle } from "../a11y/PageHeading";
 import { useAnnounce } from "../a11y/Announcer";
 import { SPACING_DEFAULT, SPACING_PRESET, spacingOn, usePrefs } from "../a11y/prefs";
 import { Icon } from "../components/Icon";
+import { ACCOMMODATION_VOICE, ROLE_VOICE, voiceNames } from "../voice/vocabulary";
 import { toAppError } from "../lib/errors";
 
 const ROLE_HINTS: Record<ChosenRole, string> = {
@@ -159,40 +160,41 @@ export default function ProfilePage() {
             <div className="field">
               <label htmlFor="full-name" className="label">Full name</label>
               <p id="full-name-hint" className="hint">{COPY.profile.nameHint}</p>
-              <input className="input" id="full-name" type="text" autoComplete="name" maxLength={LIMITS.maxNameLength} value={fullName}
+              <input className="input" id="full-name" type="text" autoComplete="name" maxLength={LIMITS.maxNameLength} value={fullName} data-voice-names="my name|name"
                 aria-describedby="full-name-hint" onChange={(e) => setFullName(e.target.value)} style={{ maxWidth: 420 }} />
             </div>
           </section>
           <ResumeSection skills={skills} setSkills={setSkills} error={errors.skills} />
 
-          <section id="s2" className="card" aria-labelledby="s2-h">
+          <section id="s2" className="card" aria-labelledby="s2-h" data-voice-names="accessibility features|my features|features I need">
             <div>
               <h2 id="s2-h" style={{ margin: 0, fontSize: "1.4rem" }}>2. Accessibility features you need to apply for jobs</h2>
               <p className="muted" style={{ margin: "6px 0 0" }}>
                 These change how this app works for you, right away. They are never shared with employers.{" "}
-                <button type="button" className="btn-link" onClick={openSettings}>Fine-tune text and spacing</button>
+                <button type="button" className="btn-link" onClick={openSettings} data-voice-names="text settings|spacing settings|fine tune">Fine-tune text and spacing</button>
               </p>
             </div>
             <fieldset>
               <legend className="sr-only">Accessibility features</legend>
               <div className="grid-auto">
-                <Feature label="Voice control" hint={'Hold to talk: "go to jobs", "open job", "apply"'} checked={prefs.voiceNav} onChange={(v) => update({ voiceNav: v })} />
-                <Feature label="Text-to-speech with word highlighting" hint="Each word lights up as it is read" checked={prefs.ttsHighlight} onChange={(v) => update({ ttsHighlight: v })} />
-                <Feature label="Voice reader" hint="Hear full job descriptions" checked={prefs.voiceReader} onChange={(v) => update({ voiceReader: v })} />
-                <Feature label="Dyslexia-friendly fonts" hint="Atkinson Hyperlegible or OpenDyslexic" checked={prefs.font !== "system"} onChange={(v) => update({ font: v ? "atkinson" : "system" })} />
-                <Feature label="Adjustable text and line spacing" hint="Text up to 200%, wider lines and letters" checked={spacingOn(prefs)} onChange={(v) => update(v ? SPACING_PRESET : SPACING_DEFAULT)} />
+                <Feature label="Voice control" hint={'Hold to talk: "go to jobs", "open job", "apply"'} checked={prefs.voiceNav} onChange={(v) => update({ voiceNav: v })} voice="voice commands" />
+                <Feature label="Text-to-speech with word highlighting" hint="Each word lights up as it is read" checked={prefs.ttsHighlight} onChange={(v) => update({ ttsHighlight: v })} voice="word highlighting|highlight words" />
+                <Feature label="Voice reader" hint="Hear full job descriptions" checked={prefs.voiceReader} onChange={(v) => update({ voiceReader: v })} voice="hear full descriptions|read full descriptions" />
+                <Feature label="Dyslexia-friendly fonts" hint="Atkinson Hyperlegible or OpenDyslexic" checked={prefs.font !== "system"} onChange={(v) => update({ font: v ? "atkinson" : "system" })} voice="dyslexia font|easy to read font" />
+                <Feature label="Adjustable text and line spacing" hint="Text up to 200%, wider lines and letters" checked={spacingOn(prefs)} onChange={(v) => update(v ? SPACING_PRESET : SPACING_DEFAULT)} voice="text spacing|adjustable spacing" />
               </div>
             </fieldset>
           </section>
 
-          <section id="s3" className="card" aria-labelledby="s3-h">
+          <section id="s3" className="card" aria-labelledby="s3-h" data-voice-names="accommodations|my accommodations|employer accommodations|what I need from my employer">
             <div>
               <h2 id="s3-h" style={{ margin: 0, fontSize: "1.4rem" }}>3. Accommodations you require from your employer</h2>
               <p className="muted" style={{ margin: "6px 0 0" }}>Required needs are checked against each listing. Preferred ones are shown but never change your results.</p>
             </div>
             <div>
               {ACCOMMODATION_CODES.map((code) => (
-                <fieldset key={code} className="row" style={{ justifyContent: "space-between", gap: "12px 24px", padding: "14px 0", borderTop: "1px solid #e4e6eb" }}>
+                <fieldset key={code} className="row" style={{ justifyContent: "space-between", gap: "12px 24px", padding: "14px 0", borderTop: "1px solid #e4e6eb" }}
+                  data-voice-names={voiceNames(ACCOMMODATION_VOICE[code])}>
                   <legend style={{ float: "left", margin: 0, maxWidth: 520 }}>
                     <span style={{ fontWeight: 700 }}>{ACCOMMODATION_LABELS[code]}</span>
                     {ACCOMMODATION_HINTS[code] && <><br /><span className="small muted" style={{ fontWeight: 400 }}>{ACCOMMODATION_HINTS[code]}</span></>}
@@ -200,7 +202,8 @@ export default function ProfilePage() {
                   <div className="seg">
                     {(["required", "preferred", "not_needed"] as const).map((n) => (
                       <label key={n}>
-                        <input type="radio" name={`need-${code}`} checked={needs[code] === n} onChange={() => setNeeds((x) => ({ ...x, [code]: n }))} />
+                        <input type="radio" name={`need-${code}`} checked={needs[code] === n} onChange={() => setNeeds((x) => ({ ...x, [code]: n }))}
+                          data-voice-names={NEED_VOICE[n]} />
                         <span className="tick"><Icon name="check" size={16} strokeWidth={3} /></span>
                         {n === "required" ? "Required" : n === "preferred" ? "Preferred" : "Not needed"}
                       </label>
@@ -218,14 +221,14 @@ export default function ProfilePage() {
             needs={needs} setNeeds={setNeeds}
           />
 
-          <section id="s5" className="card" aria-labelledby="s5-h">
+          <section id="s5" className="card" aria-labelledby="s5-h" data-voice-names="roles|job preferences|roles and location">
             <h2 id="s5-h" style={{ margin: 0, fontSize: "1.4rem" }}>5. Roles you are interested in</h2>
             <fieldset aria-describedby={errors.roles ? "roles-err" : undefined}>
               <legend>Choose at least one role</legend>
               <div className="grid-auto">
                 {CHOSEN_ROLES.map((r) => (
                   <label key={r} className="check">
-                    <input id={`role-${r}`} type="checkbox" checked={roles.includes(r)} aria-invalid={!!errors.roles}
+                    <input id={`role-${r}`} type="checkbox" checked={roles.includes(r)} aria-invalid={!!errors.roles} data-voice-names={voiceNames(ROLE_VOICE[r])}
                       onChange={(e) => setRoles((x) => (e.target.checked ? [...x, r] : x.filter((y) => y !== r)))} />
                     <span><strong>{ROLE_LABELS[r]}</strong><br /><span className="small muted">{ROLE_HINTS[r]}</span></span>
                   </label>
@@ -239,7 +242,8 @@ export default function ProfilePage() {
                 <div className="seg">
                   {(["remote", "onsite", "either"] as const).map((w) => (
                     <label key={w}>
-                      <input type="radio" name="workplace" checked={remotePreference === w} onChange={() => setRemotePreference(w)} />
+                      <input type="radio" name="workplace" checked={remotePreference === w} onChange={() => setRemotePreference(w)}
+                        data-voice-names={w === "either" ? "either way|doesn't matter|anywhere" : w === "remote" ? "fully remote" : "in the office|in person only"} />
                       <span className="tick"><Icon name="check" size={16} strokeWidth={3} /></span>
                       {w === "remote" ? "Remote" : w === "onsite" ? "On-site" : "Either"}
                     </label>
@@ -248,7 +252,7 @@ export default function ProfilePage() {
               </fieldset>
               <div className="field" style={{ flex: "1 1 260px" }}>
                 <label htmlFor="loc" className="label">City or region <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-                <input className="input" id="loc" type="text" maxLength={100} value={locationText} onChange={(e) => setLocationText(e.target.value)} placeholder="For example: Chicago or United States" />
+                <input className="input" id="loc" type="text" maxLength={100} value={locationText} data-voice-names="city|location|region|where I live" onChange={(e) => setLocationText(e.target.value)} placeholder="For example: Chicago or United States" />
               </div>
             </div>
           </section>
@@ -264,8 +268,8 @@ export default function ProfilePage() {
             {status}
           </p>
           <div className="row">
-            <button className="btn btn-secondary" type="button" onClick={() => void doSave()} disabled={busy}>Save</button>
-            <button className="btn btn-primary btn-lg" type="button" onClick={() => void saveAndFind()} disabled={busy} style={{ minHeight: 52 }}>
+            <button className="btn btn-secondary" type="button" onClick={() => void doSave()} disabled={busy} data-voice-names="save profile|save changes|save my profile">Save</button>
+            <button className="btn btn-primary btn-lg" type="button" onClick={() => void saveAndFind()} disabled={busy} style={{ minHeight: 52 }} data-voice-names="save and search|find matching jobs|save and see jobs">
               Save and find jobs
             </button>
           </div>
@@ -275,10 +279,14 @@ export default function ProfilePage() {
   );
 }
 
-function Feature({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+// Everyday ways to say each level of need (voice control).
+// ("need" and "no" are a verb and filler, so "I need it" or "no need" could never name these.)
+const NEED_VOICE = { required: "must have|essential", preferred: "nice to have|would like|optional", not_needed: "not required|not important|none" };
+
+function Feature({ label, hint, checked, onChange, voice }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void; voice?: string }) {
   return (
     <label className="check">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} data-voice-names={voice} />
       <span><strong>{label}</strong><br /><span className="small muted">{hint}</span></span>
     </label>
   );
@@ -370,10 +378,10 @@ function ResumeSection({ skills, setSkills, error }: { skills: string[]; setSkil
   };
 
   return (
-    <section id="s1" className="card" aria-labelledby="s1-h">
+    <section id="s1" className="card" aria-labelledby="s1-h" data-voice-names="resume|resume and skills|skills|my skills">
       <h2 id="s1-h" style={{ margin: 0, fontSize: "1.4rem" }}>1. Upload your resume</h2>
       <label className="check">
-        <input id={consentId} type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        <input id={consentId} type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} data-voice-names="consent|resume consent|allow AI|AI extraction" />
         <span><strong>{COPY.profile.resumeConsent}</strong> {COPY.profile.resumeConsentDetail}</span>
       </label>
       {mode === "pdf" ? (
@@ -384,18 +392,18 @@ function ResumeSection({ skills, setSkills, error }: { skills: string[]; setSkil
             <p className="small muted" style={{ margin: 0 }}>{COPY.profile.resumeLimits}</p>
           </div>
           <input ref={fileRef} id="resume-file" type="file" accept="application/pdf,.pdf" className="sr-only" tabIndex={-1} aria-label="Resume PDF" disabled={!consent || reading} onChange={(e) => void onFile(e.target.files?.[0])} />
-          <button type="button" className="btn btn-secondary" disabled={reading}
+          <button type="button" className="btn btn-secondary" disabled={reading} data-voice-names="upload resume|upload a PDF|upload my resume|choose file"
             onClick={() => (consent ? fileRef.current?.click() : setMsg({ kind: "error", text: "Tick the consent box first, or add skills by hand." }))}>
             {lastFile ? "Choose another PDF" : "Choose a PDF"}
           </button>
-          <button className="btn btn-ghost" type="button" onClick={() => setMode("text")}>Paste text instead</button>
+          <button className="btn btn-ghost" type="button" onClick={() => setMode("text")} data-voice-names="paste my resume|paste resume|type my resume">Paste text instead</button>
         </div>
       ) : (
         <div className="field">
           <label htmlFor="resume-text" className="label">Paste your resume text</label>
           <textarea id="resume-text" className="input" rows={6} value={text} onChange={(e) => setText(e.target.value)} />
           <div className="row">
-            <button className="btn btn-secondary" type="button" disabled={!consent || reading || !text.trim()} onClick={() => void runExtract({ text })}>Find skills in this text</button>
+            <button className="btn btn-secondary" type="button" disabled={!consent || reading || !text.trim()} onClick={() => void runExtract({ text })} data-voice-names="find skills|extract skills|read my resume">Find skills in this text</button>
             <button className="btn btn-ghost" type="button" onClick={() => setMode("pdf")}>Upload a PDF instead</button>
           </div>
         </div>
@@ -422,7 +430,7 @@ function ResumeSection({ skills, setSkills, error }: { skills: string[]; setSkil
         <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
           <div className="field" style={{ flex: "1 1 240px" }}>
             <label htmlFor="add-skill" className="label">Add a skill</label>
-            <input className="input" id="add-skill" type="text" value={newSkill} placeholder="For example: Tailwind CSS" maxLength={LIMITS.maxSkillLength}
+            <input className="input" id="add-skill" type="text" value={newSkill} placeholder="For example: Tailwind CSS" maxLength={LIMITS.maxSkillLength} data-voice-names="new skill|type a skill"
               aria-invalid={!!error} aria-describedby={error ? "skills-err" : undefined}
               onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSkill(); } }} />
           </div>
@@ -452,9 +460,9 @@ function SkillChip({ name, onRename, onRemove }: { name: string; onRename: (n: s
           onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setValue(name); setEditing(false); } }}
           style={{ minHeight: 36, border: "2px solid var(--field-border)", borderRadius: 8, padding: "0 8px", width: 160 }} />
       ) : (
-        <button type="button" onClick={() => setEditing(true)} aria-label={`${name}, rename`} style={{ minHeight: 36, border: 0, background: "transparent", padding: "0 8px", fontWeight: 600, cursor: "text" }}>{name}</button>
+        <button type="button" onClick={() => setEditing(true)} aria-label={`${name}, rename`} data-voice-names={`rename ${name}|edit ${name}|change ${name}`} style={{ minHeight: 36, border: 0, background: "transparent", padding: "0 8px", fontWeight: 600, cursor: "text" }}>{name}</button>
       )}
-      <button type="button" aria-label={`Remove ${name}`} onClick={onRemove} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 999, border: 0, background: "transparent", cursor: "pointer" }}>
+      <button type="button" aria-label={`Remove ${name}`} onClick={onRemove} data-voice-names={`delete ${name}|remove the skill ${name}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 999, border: 0, background: "transparent", cursor: "pointer" }}>
         <Icon name="x" size={16} strokeWidth={2.4} />
       </button>
     </li>
@@ -498,9 +506,10 @@ function PrivateSection(p: {
   }, [p, prefs, update, dismissed]);
 
   return (
-    <section id="s4" className="card" aria-labelledby="s4-h" style={{ background: "var(--surface-2)" }}>
+    <section id="s4" className="card" aria-labelledby="s4-h" style={{ background: "var(--surface-2)" }} data-voice-private>
       <details>
-        <summary style={{ cursor: "pointer", listStyle: "none" }}>
+        <summary style={{ cursor: "pointer", listStyle: "none" }} data-voice-command data-voice-label="Your disability or neurodivergence (private)"
+          data-voice-names="show or hide|disability|neurodivergence|about you|private section">
           <span className="row" style={{ justifyContent: "space-between", gap: "12px 20px", alignItems: "flex-start" }}>
             <span className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap", flex: "1 1 400px" }}>
               <Icon name="lock" size={24} />
@@ -594,7 +603,7 @@ function DeleteSection() {
       <h2 id="del-h" style={{ margin: 0, fontSize: "1.4rem" }}>{COPY.profile.deleteTitle}</h2>
       <p className="muted" style={{ margin: 0 }}>{COPY.profile.deleteExplain}</p>
       <button type="button" className="btn btn-secondary" style={{ alignSelf: "flex-start", borderColor: "var(--error)", color: "var(--error-ink)" }}
-        onClick={() => { setResult(null); ref.current?.showModal(); }}>
+        onClick={() => { setResult(null); ref.current?.showModal(); }} data-voice-names="delete my data|delete my account|erase my data|remove my account">
         Delete all my data
       </button>
       <dialog ref={ref} className="modal" aria-labelledby={titleId} onCancel={(e) => { if (result) { e.preventDefault(); void finish(); } }}>

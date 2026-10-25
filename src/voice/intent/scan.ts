@@ -2,6 +2,15 @@
 // labelled region, panel with a heading) by its legend or heading. Alternate names come from
 // data-voice-names="a|b|c". A closed dialog's controls count only when the dialog names its
 // opener (data-voice-opener="<data-voice-id of the button>"), e.g. Accessibility settings.
+// Other annotations:
+//   data-voice-label="…"   the name voice uses instead of the visible text (when that misleads)
+//   data-voice-command     saying its name performs it (Read aloud, Pause, Stop), no verb needed;
+//                          on a toggle, ="on" or ="off" says which way (Save / Unsave)
+//   data-voice-private     never described to the assistant (disability details); still usable
+//   data-voice-primary     the main region of the page (the open job), preferred when unsure
+//   data-voice-danger      irreversible: voice may point at it but never press it
+// Voice-only commands registered by pages (actions.ts) are added as targets too.
+import { actionsVersion, currentActions } from "./actions";
 import { tokens, type Candidate, type Kind } from "./match";
 
 export interface Target extends Candidate {
@@ -9,11 +18,17 @@ export interface Target extends Candidate {
   opener?: HTMLElement; // click this first to reveal el
   danger?: boolean; // irreversible: voice may point at it but never press it
   toggle?: boolean; // a button that stays pressed (aria-pressed)
+  command?: boolean; // its name is the command: say it and it happens
+  commandWay?: "on" | "off"; // for a toggle command: which way saying its name turns it
+  private?: boolean; // never described to the assistant
+  primary?: boolean; // the page's main region
+  run?: () => unknown; // a voice-only command (actions.ts)
+  message?: string | (() => string);
   label: string; // the name shown and spoken
 }
 
 const CONTROLS =
-  'a[href], button, input:not([type="hidden"]), select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"]';
+  'a[href], button, summary, input:not([type="hidden"]), select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"]';
 const GROUPS =
   'fieldset, [role="group"], [role="region"], [role="radiogroup"], aside, section, article, nav[aria-label], form, dialog, .panel, .card, [data-voice-names]:not(' + CONTROLS + ")";
 const SKIP = '[data-voice-ignore], .voice-wrap, .voice-hl-layer, [aria-hidden="true"], [inert]';
@@ -40,6 +55,7 @@ function byIds(ids: string | null): string {
 }
 
 function controlName(el: HTMLElement): string {
+  if (el.dataset.voiceLabel) return el.dataset.voiceLabel;
   const aria = el.getAttribute("aria-label") || byIds(el.getAttribute("aria-labelledby"));
   if (aria) return aria;
   if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {
@@ -51,6 +67,7 @@ function controlName(el: HTMLElement): string {
 }
 
 function groupName(el: HTMLElement): string {
+  if (el.dataset.voiceLabel) return el.dataset.voiceLabel;
   const aria = el.getAttribute("aria-label") || byIds(el.getAttribute("aria-labelledby"));
   if (aria) return aria;
   if (el instanceof HTMLFieldSetElement) {
@@ -101,6 +118,12 @@ export function scanPage(root: ParentNode = document): Target[] {
   // Where an element can be reached from: on screen, behind a declared opener, or not at all.
   const reach = (el: HTMLElement): { ok: boolean; opener?: HTMLElement } => {
     if (el.closest(SKIP)) return { ok: false };
+    // Inside a collapsed <details>: reached by opening its summary first.
+    const det = el.closest("details");
+    if (det && !det.open && !el.closest("summary")) {
+      const summary = det.querySelector<HTMLElement>(":scope > summary");
+      return summary && reach(summary).ok ? { ok: true, opener: summary } : { ok: false };
+    }
     const dlg = el.closest("dialog");
     if (dlg && !dlg.open) {
       const id = dlg.getAttribute("data-voice-opener");
@@ -144,6 +167,8 @@ export function scanPage(root: ParentNode = document): Target[] {
       inView: !r.opener && inView(el),
       // The item already open (the selected job's card): its details are shown elsewhere.
       current: el.getAttribute("aria-current") === "true" || el.getAttribute("aria-current") === "page",
+      private: !!el.closest("[data-voice-private]"),
+      primary: el.hasAttribute("data-voice-primary"),
     });
   }
 
@@ -177,9 +202,58 @@ export function scanPage(root: ParentNode = document): Target[] {
       inView: !r.opener && inView(el),
       danger: !!el.closest("[data-voice-danger]"),
       toggle: kind === "button" && el.hasAttribute("aria-pressed"),
+      command: el.hasAttribute("data-voice-command"),
+      commandWay: (["on", "off"] as const).find((w) => w === el.getAttribute("data-voice-command")),
+      private: !!el.closest("[data-voice-private]"),
     });
   }
-  return canonicalize(out);
+  return withActions(withOptions(canonicalize(out)));
+}
+
+// Each option of a dropdown ("Status: Applied", "Sort by: Deadline") is a target of its own, so it
+// can be chosen by name. Like a radio button: chosen with a verb, only selected without one.
+function withOptions(list: Target[]): Target[] {
+  const out = [...list];
+  for (const t of list) {
+    if (t.kind !== "select" || !(t.el instanceof HTMLSelectElement)) continue;
+    const select = t.el;
+    const field = t.label.replace(/ for .*$/, "");
+    for (const option of select.options) {
+      if (option.disabled || !option.text.trim()) continue;
+      const text = option.text.trim();
+      out.push({
+        id: out.length,
+        kind: "radio",
+        el: select,
+        label: `${field}: ${text}`,
+        names: [text, `${field} ${text}`, `${t.label} ${text}`],
+        parent: t.parent,
+        hidden: t.hidden,
+        opener: t.opener,
+        checked: option.selected,
+        private: t.private,
+        inView: t.inView,
+        run: () => {
+          Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(select, option.value);
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+        message: `${field}: ${text}.`,
+      });
+    }
+  }
+  return out;
+}
+
+// Voice-only commands, highlighted at their anchor and narrowed by the regions around it.
+function withActions(list: Target[]): Target[] {
+  const out = [...list];
+  for (const a of currentActions()) {
+    const anchor = a.anchor?.() ?? document.querySelector<HTMLElement>("main") ?? document.body;
+    let parent: number | undefined;
+    for (const g of list) if (g.kind === "group" && g.el.contains(anchor) && (parent === undefined || list[parent].el.contains(g.el))) parent = g.id;
+    out.push({ id: out.length, kind: "button", el: anchor, label: a.names[0], names: a.names, parent, command: true, run: a.run, message: a.message, inView: true });
+  }
+  return out;
 }
 
 const unique = (xs: string[]) => [...new Map(xs.map((x) => [x.toLowerCase(), x])).values()];
@@ -315,8 +389,11 @@ function watch() {
   window.addEventListener("resize", drop, { passive: true });
 }
 
+let cachedVersion = -1;
 export function scanCached(): Target[] {
   watch();
+  if (cachedVersion !== actionsVersion()) cache = null;
+  cachedVersion = actionsVersion();
   return (cache ??= scanPage());
 }
 

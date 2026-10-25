@@ -139,6 +139,7 @@ export const COPY = {
     noMatch: "Nothing on this page matches that yet. Try the name of a button, link or setting.",
     unsure: (name: string) => `Did you mean "${name}"? Say "yes", or say it again with more detail.`,
     dismissed: "Okay.",
+    maybe: (name: string) => `${name}?`,
     whichOne: (a: string, b: string) => `"${a}" or "${b}"? Say which one.`,
   },
   tts: {

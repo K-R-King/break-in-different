@@ -81,7 +81,7 @@ export default function PracticePage() {
   const transcriptToggle = style === "conversation" && (
     <div className="field">
       <label className="ck">
-        <input type="checkbox" checked={showTranscript} aria-describedby="transcript-hint" onChange={(e) => setShowTranscript(e.target.checked)} />
+        <input type="checkbox" checked={showTranscript} aria-describedby="transcript-hint" onChange={(e) => setShowTranscript(e.target.checked)} data-voice-names="transcript|show the text|show transcript" />
         <span>{COPY.practice.showTranscript}</span>
       </label>
       <p id="transcript-hint" className="hint">{COPY.practice.showTranscriptHint}</p>
@@ -204,7 +204,7 @@ export default function PracticePage() {
       )}
 
       {!started ? (
-        <section className="card stack" aria-labelledby="setup-h">
+        <section className="card stack" aria-labelledby="setup-h" data-voice-names="setup|practice setup">
           <h2 id="setup-h" style={{ margin: 0, fontSize: "1.3rem" }}>Before you start</h2>
           <p style={{ margin: 0 }}>{COPY.practice.lede}</p>
           <fieldset>
@@ -212,7 +212,8 @@ export default function PracticePage() {
             {styleFromProfile && <p className="hint">{COPY.practice.styleFromProfile}</p>}
             {(["conversation", "written"] as const).map((s) => (
               <label key={s} className="ck">
-                <input type="radio" name="style" checked={style === s} onChange={() => setStyle(s)} />
+                <input type="radio" name="style" checked={style === s} onChange={() => setStyle(s)}
+                  data-voice-names={s === "conversation" ? "spoken|out loud|by voice|talking" : "written|in writing|typed|typing"} />
                 <span>
                   {s === "conversation" ? COPY.practice.styleConversation : COPY.practice.styleWritten}
                   <span className="muted"> ({s === "conversation" ? COPY.practice.styleConversationHint : COPY.practice.styleWrittenHint})</span>
@@ -223,7 +224,8 @@ export default function PracticePage() {
           {transcriptToggle}
           <div className="field">
             <label className="ck">
-              <input type="checkbox" checked={advance} aria-describedby="advance-hint" onChange={(e) => { setAdvance(e.target.checked); if (!e.target.checked) setPlan(null); }} />
+              <input type="checkbox" checked={advance} aria-describedby="advance-hint" onChange={(e) => { setAdvance(e.target.checked); if (!e.target.checked) setPlan(null); }}
+                data-voice-names="questions in advance|see the questions first|preview the questions" />
               <span>{COPY.practice.advance}</span>
             </label>
             <p id="advance-hint" className="hint">{COPY.practice.advanceHint}</p>
@@ -233,24 +235,26 @@ export default function PracticePage() {
           {plan ? (
             <>
               <PlanList plan={plan} />
-              <button className="btn btn-primary btn-lg" type="button" disabled={busy} onClick={() => void ask("start", [])} style={{ alignSelf: "flex-start", minHeight: 52 }}>
+              <button className="btn btn-primary btn-lg" type="button" disabled={busy} onClick={() => void ask("start", [])} style={{ alignSelf: "flex-start", minHeight: 52 }}
+                data-voice-command data-voice-names="start|begin|I'm ready|start the interview|let's start">
                 {busy ? COPY.practice.thinking : COPY.practice.ready}
               </button>
             </>
           ) : (
-            <button className="btn btn-primary btn-lg" type="button" disabled={busy} onClick={() => void (advance ? loadPlan() : ask("start", []))} style={{ alignSelf: "flex-start", minHeight: 52 }}>
+            <button className="btn btn-primary btn-lg" type="button" disabled={busy} onClick={() => void (advance ? loadPlan() : ask("start", []))} style={{ alignSelf: "flex-start", minHeight: 52 }}
+              data-voice-command data-voice-names="start|begin|start the interview|let's start|start practicing">
               {busy ? (advance ? COPY.practice.planning : COPY.practice.thinking) : "Start practice"}
             </button>
           )}
         </section>
       ) : (
-        <section className="card stack" aria-labelledby="conv-h">
+        <section className="card stack" aria-labelledby="conv-h" data-voice-names="the conversation|the interview" data-voice-primary>
           <h2 id="conv-h" style={{ margin: 0, fontSize: "1.3rem" }}>Conversation</h2>
           {scripted && <div className="callout callout-warn"><Icon name="info" /><span>{COPY.practice.scripted}</span></div>}
           {transcriptToggle}
           {plan && (
             <details open className="panel" style={{ padding: "12px 16px" }}>
-              <summary style={{ fontWeight: 700, cursor: "pointer" }}>{COPY.practice.planTitle} ({plan.length})</summary>
+              <summary style={{ fontWeight: 700, cursor: "pointer" }} data-voice-command data-voice-names="the questions|planned questions|question list">{COPY.practice.planTitle} ({plan.length})</summary>
               <PlanList plan={plan} bare />
             </details>
           )}
@@ -268,7 +272,7 @@ export default function PracticePage() {
                   <p style={{ margin: 0 }}>{l.text}</p>
                 )}
                 {l.role === "interviewer" && (
-                  <button className="btn btn-ghost btn-sm" type="button" style={{ alignSelf: "flex-start" }} onClick={() => void speaker.play(i, l)}>
+                  <button className="btn btn-ghost btn-sm" type="button" style={{ alignSelf: "flex-start" }} onClick={() => void speaker.play(i, l)} data-voice-command>
                     <Icon name="volume" size={18} />Play<span className="sr-only"> what the interviewer said</span>
                   </button>
                 )}
@@ -296,32 +300,36 @@ export default function PracticePage() {
                 </div>
                 <p id="answer-hint" className="hint">{COPY.practice.noTimer} Press Ctrl+Enter to send.</p>
                 <textarea
-                  id="answer" ref={answerRef} className="input" rows={5} maxLength={2000} value={answer} aria-describedby="answer-hint"
+                  id="answer" ref={answerRef} className="input" rows={5} maxLength={2000} value={answer} aria-describedby="answer-hint" data-voice-names="my answer|answer box|answer"
                   onChange={(e) => setAnswer(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(answer); } }}
                 />
               </div>
               <div className="field">
                 <label className="ck">
-                  <input type="checkbox" checked={autoSend} aria-describedby="autosend-hint" onChange={(e) => setAutoSend(e.target.checked)} />
+                  <input type="checkbox" checked={autoSend} aria-describedby="autosend-hint" onChange={(e) => setAutoSend(e.target.checked)} data-voice-names="send automatically|auto send" />
                   <span>{COPY.practice.autoSend}</span>
                 </label>
                 <p id="autosend-hint" className="hint">{COPY.practice.autoSendHint}</p>
               </div>
               <div className="row">
-                <button className="btn btn-primary" type="button" disabled={busy || !answer.trim() || last?.role !== "interviewer"} onClick={() => send(answer)}>Send answer</button>
-                <button className="btn btn-secondary" type="button" disabled={busy} onClick={needMoment}>I need a moment</button>
-                <button className="btn btn-secondary" type="button" disabled={lastQuestionIndex < 0} onClick={() => void speaker.play(lastQuestionIndex, lines[lastQuestionIndex])}>Repeat</button>
-                <button className="btn btn-secondary" type="button" disabled={busy || last?.role !== "interviewer"} onClick={() => { speaker.stop(); void ask("rephrase", lines); }}>Say it differently</button>
+                <button className="btn btn-primary" type="button" disabled={busy || !answer.trim() || last?.role !== "interviewer"} onClick={() => send(answer)}
+                  data-voice-command data-voice-names="send|send it|send my answer|submit my answer">Send answer</button>
+                <button className="btn btn-secondary" type="button" disabled={busy} onClick={needMoment} data-voice-command data-voice-names="give me a moment|one moment|hold on|let me think">I need a moment</button>
+                <button className="btn btn-secondary" type="button" disabled={lastQuestionIndex < 0} onClick={() => void speaker.play(lastQuestionIndex, lines[lastQuestionIndex])}
+                  data-voice-command data-voice-names="repeat the question|say that again|repeat that|what was the question">Repeat</button>
+                <button className="btn btn-secondary" type="button" disabled={busy || last?.role !== "interviewer"} onClick={() => { speaker.stop(); void ask("rephrase", lines); }}
+                  data-voice-command data-voice-names="rephrase|say it another way|reword it|I don't understand the question">Say it differently</button>
               </div>
             </div>
           )}
 
           <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 18 }}>
-            <button className={done ? "btn btn-primary" : "btn btn-secondary"} type="button" disabled={feedbackBusy || busy || answered === 0} onClick={() => void getFeedback()}>
+            <button className={done ? "btn btn-primary" : "btn btn-secondary"} type="button" disabled={feedbackBusy || busy || answered === 0} onClick={() => void getFeedback()}
+              data-voice-command data-voice-names="feedback|get feedback|end the interview|I'm done|finish the interview">
               {feedbackBusy ? "Preparing feedback…" : done ? "Get feedback" : "End and get feedback"}
             </button>
-            <button className="btn btn-ghost" type="button" onClick={startOver}>Start over</button>
+            <button className="btn btn-ghost" type="button" onClick={startOver} data-voice-names="restart|restart the practice|reset">Start over</button>
           </div>
           <p className="hint">{COPY.practice.aiNote}</p>
         </section>
@@ -483,7 +491,8 @@ function HoldToAnswer({ onText, onStart, disabled }: { onText: (t: string) => vo
     }
   };
   return (
-    <button type="button" className="btn btn-secondary" disabled={disabled} aria-pressed={state === "rec"} title={COPY.voice.privacy}
+    // Press-and-hold recording: not something voice control can press (data-voice-ignore).
+    <button type="button" className="btn btn-secondary" disabled={disabled} aria-pressed={state === "rec"} title={COPY.voice.privacy} data-voice-ignore
       onPointerDown={(e) => { e.preventDefault(); void down(); }} onPointerUp={() => void up()} onPointerLeave={() => void up()}
       onKeyDown={(e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); void down(); } }}
       onKeyUp={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); void up(); } }}>

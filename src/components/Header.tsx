@@ -8,8 +8,8 @@ import { Icon } from "./Icon";
 
 // voice: other everyday names for each page, so it can be reached by voice (see src/voice/intent).
 const LINKS = [
-  { to: "/", label: "Home", end: true, voice: "home page|start page" },
-  { to: "/profile", label: "Profile", voice: "my profile|my skills|resume" },
+  { to: "/", label: "Home", end: true, voice: "home page" },
+  { to: "/profile", label: "Profile", voice: "my profile|my skills" },
   { to: "/jobs", label: "Jobs Listing", voice: "jobs|job search|job listings|find jobs|search jobs" },
   { to: "/tracker", label: "Application Tracker", voice: "applications|my applications|tracker|saved jobs" },
 ];
@@ -27,7 +27,7 @@ export function Header() {
           <img src={logo} alt="Break In Different home" width={124} height={52} />
         </Link>
         {isAuthenticated && (
-          <nav aria-label="Main" style={{ flex: "1 1 auto" }}>
+          <nav aria-label="Main" style={{ flex: "1 1 auto" }} data-voice-names="navigation|menu|main menu|pages">
             <ul className="nav">
               {LINKS.map((l) => (
                 <li key={l.to}>
@@ -50,6 +50,7 @@ export function Header() {
               <button
                 className="btn btn-ghost"
                 type="button"
+                data-voice-names="log me out|sign me out"
                 onClick={() => {
                   void signOut().then(() => navigate("/"));
                 }}

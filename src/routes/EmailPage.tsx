@@ -11,6 +11,7 @@ import { useAnnounce } from "../a11y/Announcer";
 import { Icon } from "../components/Icon";
 import { toAppError } from "../lib/errors";
 import { useVoice } from "../voice/VoiceProvider";
+import { ACCOMMODATION_VOICE, voiceNames } from "../voice/vocabulary";
 import { PushToTalkRecorder } from "../voice/recorder";
 
 export default function EmailPage() {
@@ -241,7 +242,7 @@ export default function EmailPage() {
             <p style={{ margin: 0 }}>{COPY.email.formBody}</p>
             <blockquote className="quote small">Listing says: "{job.accommodationForm.quote}"</blockquote>
             <span className="row" style={{ gap: 12 }}>
-              <a className="btn btn-primary" href={job.accommodationForm.url} target="_blank" rel="noopener noreferrer">
+              <a className="btn btn-primary" href={job.accommodationForm.url} target="_blank" rel="noopener noreferrer" data-voice-names="accommodation form|employer's form|their form">
                 {COPY.email.formOpen}<Icon name="external" size={18} /><span className="sr-only"> (opens in a new tab)</span>
               </a>
               <span className="small">{COPY.email.formPreferEmail}</span>
@@ -254,14 +255,15 @@ export default function EmailPage() {
 
       <div className="sidebar-layout">
         <div className="side" style={{ flex: "1 1 360px" }}>
-          <section className="card" aria-labelledby="ask-h">
+          <section className="card" aria-labelledby="ask-h" data-voice-names="what to ask for|accommodations to request|my requests">
             <h2 id="ask-h" style={{ margin: 0, fontSize: "1.3rem" }}>What would you like to ask for?</h2>
             <p className="hint">Filled in from your required accommodations. Choose at least one.</p>
             <fieldset>
               <legend className="sr-only">Accommodations to request</legend>
               {ACCOMMODATION_CODES.map((c) => (
                 <label key={c} className="ck">
-                  <input id={`acc-${c}`} type="checkbox" checked={codes.includes(c)} onChange={(e) => setCodes((x) => (e.target.checked ? [...x, c] : x.filter((y) => y !== c)))} />
+                  <input id={`acc-${c}`} type="checkbox" checked={codes.includes(c)} onChange={(e) => setCodes((x) => (e.target.checked ? [...x, c] : x.filter((y) => y !== c)))}
+                    data-voice-names={voiceNames(ACCOMMODATION_VOICE[c])} />
                   <span>{ACCOMMODATION_LABELS[c]}{ACCOMMODATION_HINTS[c] && <span className="muted"> ({ACCOMMODATION_HINTS[c]})</span>}</span>
                 </label>
               ))}
@@ -269,18 +271,19 @@ export default function EmailPage() {
             <div className="field">
               <label htmlFor="extra" className="label">Anything else, in your own words <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
               <p id="extra-hint" className="hint">Added to the email exactly as you write it.</p>
-              <textarea id="extra" className="input" rows={2} maxLength={500} value={extra} aria-describedby="extra-hint" onChange={(e) => { setExtra(e.target.value); setOptionsChanged(true); }} />
+              <textarea id="extra" className="input" rows={2} maxLength={500} value={extra} data-voice-names="in my own words|other requests|notes|anything else" aria-describedby="extra-hint" onChange={(e) => { setExtra(e.target.value); setOptionsChanged(true); }} />
             </div>
           </section>
 
-          <section className="card" aria-labelledby="dis-h">
+          <section className="card" aria-labelledby="dis-h" data-voice-private data-voice-names="disclosure|disclose">
             <fieldset>
               <legend id="dis-h" style={{ fontSize: "1.2rem" }}>Would you like to disclose your disability?</legend>
               <p className="hint" style={{ marginBottom: 12 }}>{COPY.email.discloseHint}</p>
               <div className="row" style={{ flexWrap: "nowrap" }}>
                 {([false, true] as const).map((v) => (
                   <label key={String(v)} className="check" style={{ flex: 1, justifyContent: "center", alignItems: "center", fontWeight: 700 }}>
-                    <input type="radio" name="disclose" checked={disclose === v} onChange={() => setDisclose(v)} />
+                    <input type="radio" name="disclose" checked={disclose === v} onChange={() => setDisclose(v)}
+                      data-voice-names={v ? "disclose|share it|mention my disability" : "don't disclose|keep it private|don't mention it"} />
                     {v ? "Yes" : "No"}
                   </label>
                 ))}
@@ -306,14 +309,15 @@ export default function EmailPage() {
             )}
             {/* Once a draft exists, "Write a new draft" sits with the draft (and lights up when it is out of date). */}
             {!latest && (
-              <button className="btn btn-primary" type="button" onClick={() => void generate()} disabled={busy} style={{ alignSelf: "flex-start" }}>
+              <button className="btn btn-primary" type="button" onClick={() => void generate()} disabled={busy} style={{ alignSelf: "flex-start" }}
+                data-voice-command data-voice-names="write the draft|write the email|draft the email">
                 {busy ? "Drafting…" : "Write my draft"}
               </button>
             )}
           </section>
         </div>
 
-        <section className="main card" aria-labelledby="draft-h" style={{ flex: "999 1 520px" }}>
+        <section className="main card" aria-labelledby="draft-h" style={{ flex: "999 1 520px" }} data-voice-names="the draft|the email|my email" data-voice-primary>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <h2 id="draft-h" style={{ margin: 0, fontSize: "1.3rem" }}>Your draft</h2>
             <p role="status" className="row" style={{ margin: 0, fontWeight: 600, gap: 8 }}>
@@ -323,10 +327,11 @@ export default function EmailPage() {
           </div>
           {latest && (
             <div className="row" style={{ gap: 8 }}>
-              <button className={`btn ${stale || cleared ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => void generate()} disabled={busy}>
+              <button className={`btn ${stale || cleared ? "btn-primary" : "btn-secondary"}`} type="button" onClick={() => void generate()} disabled={busy}
+                data-voice-command data-voice-names="rewrite|rewrite it|new draft|redo the draft|update the draft">
                 <Icon name="refresh" size={18} />{busy ? "Drafting…" : COPY.email.rewrite}
               </button>
-              <button className="btn btn-ghost" type="button" onClick={() => setConfirmClear(true)} disabled={busy || cleared}>
+              <button className="btn btn-ghost" type="button" onClick={() => setConfirmClear(true)} disabled={busy || cleared} data-voice-names="clear it|empty the draft|erase the draft">
                 <Icon name="x" size={18} />Clear draft
               </button>
             </div>
@@ -354,18 +359,18 @@ export default function EmailPage() {
           <div className="field">
             <label htmlFor="to" className="label">To</label>
             <p id="to-hint" className="hint">{COPY.email.recipientHint}</p>
-            <input id="to" className="input" type="email" value={to} aria-describedby="to-hint" onChange={(e) => setTo(e.target.value)} />
+            <input id="to" className="input" type="email" value={to} data-voice-names="recipient|email address|send to" aria-describedby="to-hint" onChange={(e) => setTo(e.target.value)} />
           </div>
           <div className="field">
             <label htmlFor="subj" className="label">Subject</label>
-            <input id="subj" className="input" type="text" value={subject} disabled={!latest} onChange={(e) => { setSubject(e.target.value); setDirty(true); }} onBlur={() => void persistEdit()} />
+            <input id="subj" className="input" type="text" value={subject} data-voice-names="subject line|email subject" disabled={!latest} onChange={(e) => { setSubject(e.target.value); setDirty(true); }} onBlur={() => void persistEdit()} />
           </div>
           <div className="field">
             <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
               <label htmlFor="body" className="label">Message</label>
               <DictateButton disabled={!latest} onText={(t) => { setBody((b) => `${b}${b.endsWith("\n") || !b ? "" : " "}${t}`); setDirty(true); }} />
             </div>
-            <textarea id="body" className="input" rows={14} value={body} disabled={!latest} aria-invalid={needsName || undefined} aria-describedby={needsName ? "name-why" : undefined}
+            <textarea id="body" className="input" rows={14} value={body} data-voice-names="message|body|email text|the message" disabled={!latest} aria-invalid={needsName || undefined} aria-describedby={needsName ? "name-why" : undefined}
               onChange={(e) => { setBody(e.target.value); setDirty(true); }} onBlur={() => void persistEdit()} />
             {needsName && (
               <div id="name-why" className="callout callout-warn" data-testid="name-placeholder">
@@ -376,8 +381,8 @@ export default function EmailPage() {
                     {!profile?.fullName && <> Add your full name in <Link to="/profile">your profile</Link> to fill it in on every draft.</>}
                   </span>
                   <span className="row" style={{ gap: 8 }}>
-                    {profile?.fullName && <button className="btn btn-primary btn-sm" type="button" onClick={useMyName}>Sign as {profile.fullName}</button>}
-                    <button className="btn btn-secondary btn-sm" type="button" onClick={selectPlaceholder}>Select {NAME_PLACEHOLDER} in the message</button>
+                    {profile?.fullName && <button className="btn btn-primary btn-sm" type="button" onClick={useMyName} data-voice-command data-voice-names="sign it|use my name|add my name">Sign as {profile.fullName}</button>}
+                    <button className="btn btn-secondary btn-sm" type="button" onClick={selectPlaceholder} data-voice-command data-voice-names="select the placeholder|find the name placeholder">Select {NAME_PLACEHOLDER} in the message</button>
                   </span>
                 </div>
               </div>
@@ -385,15 +390,18 @@ export default function EmailPage() {
           </div>
 
           <div className="row">
+            {/* Approving is the person's own consent: saying "approve the email" does it. */}
             <button className="btn btn-primary btn-lg" type="button" onClick={() => void onApprove()} disabled={!latest || busy || approved || needsName}
+              data-voice-command data-voice-names="approve|approve it|approve the email|I approve|looks good"
               aria-describedby={needsName ? "name-why" : undefined} style={{ minHeight: 52 }}>
               {approved ? "Approved" : "Approve draft"}
             </button>
-            <button className="btn btn-secondary" type="button" disabled={!approved} aria-describedby={!approved ? "lock-why" : undefined} onClick={() => void onCopy()}>
+            <button className="btn btn-secondary" type="button" disabled={!approved} aria-describedby={!approved ? "lock-why" : undefined} onClick={() => void onCopy()}
+              data-voice-command data-voice-names="copy|copy it|copy the email">
               <Icon name="copy" size={18} />{copied && approved ? "Copied" : "Copy email"}
             </button>
             {approved ? (
-              <a className="btn btn-secondary" href={mailto}><Icon name="mail" size={18} />Open in mail app</a>
+              <a className="btn btn-secondary" href={mailto} data-voice-command data-voice-names="open my mail|open in mail|email it|send it from my mail app"><Icon name="mail" size={18} />Open in mail app</a>
             ) : (
               <button className="btn btn-secondary" type="button" disabled aria-describedby="lock-why"><Icon name="mail" size={18} />Open in mail app</button>
             )}
@@ -407,19 +415,21 @@ export default function EmailPage() {
               <p style={{ margin: 0, fontWeight: 700 }}>Employer's application page</p>
               <p className="hint">Opens in a new tab. We'll ask if you applied when you come back.</p>
             </div>
-            <a className="btn btn-secondary" href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={() => { awayToEmployer.current = true; }}>
+            <a className="btn btn-secondary" href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={() => { awayToEmployer.current = true; }}
+              data-voice-names="apply|apply on their site|employer site|employer's website|employer's application page">
               Open application page<Icon name="external" size={18} /><span className="sr-only"> (opens in a new tab)</span>
             </a>
           </div>
           {askApplied && (
             <div role="region" aria-label="Did you apply?" className="row" style={{ padding: "14px 16px", borderRadius: 12, border: "2px solid var(--ink)" }}>
               <p style={{ margin: 0, fontWeight: 700, flex: "1 1 220px" }}>Back from the employer's site. Did you apply?</p>
-              <button className="btn btn-primary" type="button" onClick={() => void onMarkApplied()}>Mark as applied</button>
-              <button className="btn btn-ghost" type="button" onClick={() => setAskApplied(false)}>Not yet</button>
+              <button className="btn btn-primary" type="button" onClick={() => void onMarkApplied()} data-voice-command data-voice-names="I applied|yes I applied|mark applied">Mark as applied</button>
+              <button className="btn btn-ghost" type="button" onClick={() => setAskApplied(false)} data-voice-command data-voice-names="not yet|I haven't applied">Not yet</button>
             </div>
           )}
           {!askApplied && (
-            <button type="button" className="btn-link" style={{ alignSelf: "flex-start" }} onClick={() => setAskApplied(true)}>Already applied? Mark it in your tracker</button>
+            <button type="button" className="btn-link" style={{ alignSelf: "flex-start" }} onClick={() => setAskApplied(true)}
+              data-voice-command data-voice-label="Mark as applied in your tracker" data-voice-names="I already applied|already applied|mark as applied|add to tracker">Already applied? Mark it in your tracker</button>
           )}
         </section>
       </div>
@@ -448,8 +458,9 @@ function ConfirmClear({ open, onCancel, onConfirm }: { open: boolean; onCancel: 
         <h2 id={titleId} style={{ margin: 0 }}>Clear this draft?</h2>
         <p style={{ margin: 0 }}>This empties the subject and message, including your edits, and you will need to approve again. Your choices on the left stay as they are.</p>
         <div className="row" style={{ justifyContent: "flex-end" }}>
-          <button ref={cancelRef} className="btn btn-secondary" type="button" onClick={onCancel}>Keep my draft</button>
-          <button className="btn btn-primary" type="button" onClick={onConfirm}>Clear draft</button>
+          <button ref={cancelRef} className="btn btn-secondary" type="button" onClick={onCancel} data-voice-command data-voice-names="keep it|cancel|don't clear">Keep my draft</button>
+          {/* Wipes the person's edits: keyboard or mouse only. */}
+          <button className="btn btn-primary" type="button" onClick={onConfirm} data-voice-danger>Clear draft</button>
         </div>
       </div>
     </dialog>
@@ -493,7 +504,8 @@ function DictateButton({ onText, disabled }: { onText: (t: string) => void; disa
     }
   };
   return (
-    <button type="button" className="btn btn-ghost" disabled={disabled} aria-pressed={state === "rec"} title={COPY.voice.privacy}
+    // Press-and-hold recording: not something voice control can press (data-voice-ignore).
+    <button type="button" className="btn btn-ghost" disabled={disabled} aria-pressed={state === "rec"} title={COPY.voice.privacy} data-voice-ignore
       onPointerDown={(e) => { e.preventDefault(); void down(); }} onPointerUp={() => void up()} onPointerLeave={() => void up()}
       onKeyDown={(e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); void down(); } }}
       onKeyUp={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); void up(); } }}>

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { usePrefs } from "./prefs";
 import { Icon } from "../components/Icon";
+import { useVoiceActions } from "../voice/intent/actions";
 import type { InterfacePrefs } from "../../shared/types";
 import {
   comboConflict, comboFromEvent, comboProblem, DEFAULT_VOICE_KEY, formatCombo, isModifierCode, setCapturing, setVoiceKey, useVoiceKey,
@@ -35,6 +36,15 @@ export function SettingsDialog() {
       d.close();
     }
   }, [settingsOpen]);
+
+  // Voice, from any page: change the text size without opening the settings.
+  const step = (dir: 1 | -1) => update({ textScale: Math.round(Math.min(2, Math.max(1, prefs.textScale + dir * 0.1)) * 10) / 10 });
+  useVoiceActions([
+    { names: ["Make the text bigger", "bigger text", "larger text", "increase the text size", "zoom in"], run: () => step(1),
+      message: () => `Text size ${Math.round(Math.min(2, prefs.textScale + 0.1) * 100)}%.`, when: () => prefs.textScale < 2 },
+    { names: ["Make the text smaller", "smaller text", "decrease the text size", "zoom out"], run: () => step(-1),
+      message: () => `Text size ${Math.round(Math.max(1, prefs.textScale - 0.1) * 100)}%.`, when: () => prefs.textScale > 1 },
+  ]);
 
   const onClose = () => {
     closeSettings();
@@ -120,7 +130,7 @@ export function SettingsDialog() {
           <VoiceShortcutSettings />
         </div>
         <div className="row" style={{ justifyContent: "space-between", padding: "16px 24px", borderTop: "1px solid var(--line)" }}>
-          <button className="btn btn-secondary" type="button" onClick={reset}>Reset to default</button>
+          <button className="btn btn-secondary" type="button" onClick={reset} data-voice-names="reset settings|reset to defaults">Reset to default</button>
           <button className="btn btn-primary" type="button" onClick={onClose}>Done</button>
         </div>
       </div>

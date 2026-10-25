@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alreadyHere, bestMatch, parse, type Candidate } from "./match";
+import { afterCorrection, alreadyHere, bestMatch, looseGuess, parse, type Candidate } from "./match";
 
 // A small model of the header, the Jobs filters and the settings dialog.
 const C: Candidate[] = [
@@ -132,6 +132,16 @@ describe("bestMatch", () => {
     expect(bestMatch("hide", header)?.id).toBe(6); // names both sides: never ruled out
   });
 
+  it("follows the latest keywords", () => {
+    const voice: Candidate[] = [
+      { id: 1, kind: "checkbox", names: ["Voice control"] },
+      { id: 2, kind: "checkbox", names: ["Voice reader"] },
+    ];
+    // While the old guess is still shown (sticky), the newest keyword moves it at once.
+    expect(bestMatch("voice controls voice reader", voice, { sticky: 1 })?.id).toBe(2);
+    expect(bestMatch("voice control", voice, { sticky: 1 })?.id).toBe(1);
+  });
+
   it("returns nothing when nothing matches", () => {
     expect(m("hmm")).toBeNull();
     expect(m("banana")).toBeNull();
@@ -143,5 +153,27 @@ describe("bestMatch", () => {
       { id: 2, kind: "button", names: ["Save"] },
     ];
     expect(bestMatch("save", two)).toMatchObject({ confident: false, ambiguousWith: 2 });
+  });
+});
+
+describe("afterCorrection", () => {
+  it("keeps only what follows a correction", () => {
+    expect(afterCorrection("voice controls wait voice reader")).toBe("voice reader");
+    expect(afterCorrection("remote, no, on site")).toBe("on site");
+    expect(afterCorrection("go to jobs actually go to the tracker")).toBe("go to the tracker");
+    expect(afterCorrection("not needed")).toBe("not needed"); // "no" inside a name is not a correction
+    expect(afterCorrection("turn on remote wait")).toBe("turn on remote wait"); // nothing after it yet: kept ("wait" is filler)
+  });
+});
+
+describe("looseGuess", () => {
+  it("highlights whatever the newest keyword names, among what is on screen", () => {
+    const c: Candidate[] = [
+      { id: 1, kind: "checkbox", names: ["Voice control"], inView: true },
+      { id: 2, kind: "checkbox", names: ["Voice reader"], inView: true },
+      { id: 3, kind: "checkbox", names: ["Reader mode"], inView: false },
+    ];
+    expect(looseGuess("voice", c)).not.toBeNull();
+    expect(looseGuess("voice controls wait reader", c)).toBe(2);
   });
 });

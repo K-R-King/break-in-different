@@ -7,10 +7,11 @@ import { COPY } from "../../copy";
 import { useLiveVoice } from "../live/LiveVoice";
 import { execute, intentLabel } from "./execute";
 import { highlights, HighlightLayer } from "./highlight";
-import { alreadyHere, bestMatch, parse, type Match, type Verb } from "./match";
+import { afterCorrection, alreadyHere, bestMatch, looseGuess, parse, type Match, type Verb } from "./match";
 import { highlightBox, scanCached, type Target } from "./scan";
 import { parseScroll, scrollPage } from "./scroll";
 import { resolveVerbOnly } from "./resolve";
+import { useVoiceActions } from "./actions";
 
 // The line under the transcript: what voice control is about to do, did, or needs.
 let status = "";
@@ -41,6 +42,8 @@ const STOP_LISTENING = /\b(stop listening|stop voice( control)?|turn off voice c
 
 export function VoiceIntent() {
   const { session, status: listen } = useLiveVoice();
+  // From any page.
+  useVoiceActions([{ names: ["Go back", "back", "previous page", "go to the previous page"], run: () => history.back(), message: "Went back.", when: () => history.length > 1 }]);
   const announce = useAnnounce();
   const recent = useRef<HTMLElement | null>(null); // last selected or acted on
   const guessed = useRef<HTMLElement | null>(null); // the guess highlighted now
@@ -55,8 +58,9 @@ export function VoiceIntent() {
     const contextOf = (targets: Target[]) => {
       const at = document.activeElement && document.activeElement !== document.body ? document.activeElement : recent.current;
       const ids = new Set<number>();
-      if (!at) return ids;
-      for (const t of targets) if (t.kind === "group" && t.el.contains(at)) ids.add(t.id);
+      if (at) for (const t of targets) if (t.kind === "group" && t.el.contains(at)) ids.add(t.id);
+      // Nothing in particular: the page's main region (the open job) is where they are.
+      if (!ids.size) for (const t of targets) if (t.primary) ids.add(t.id);
       return ids;
     };
     const pick = (text: string, targets: Target[]): Match | null =>
@@ -85,7 +89,8 @@ export function VoiceIntent() {
     // definite: the turn really ended (turn.end), not just predicted to (turn.eager_end).
     const evaluate = (final: boolean, definite = false) => {
       if (busy.current) return;
-      const text = session.getSnapshot().transcript;
+      // After a correction ("…wait, voice reader") only the corrected part counts.
+      const text = afterCorrection(session.getSnapshot().transcript);
       if (!text) {
         if (!suggestion.current) highlights.clearGuess(); // keep showing what "yes" would confirm
         return;
@@ -148,8 +153,9 @@ export function VoiceIntent() {
         const anchor = idOf(targets, recent.current) ?? idOf(targets, focus) ?? around;
         const r = resolveVerbOnly(said.verb, anchor, targets);
         if (!final) {
-          // Show what the verb will apply to while it is still being said.
-          if (r) {
+          // Show what the verb will apply to while it is still being said, only once it is clearly
+          // about the selection ("turn it on", "yes"); "go to the…" is still heading somewhere.
+          if (r && (said.verb === "do" || /\b(it|that|this|them|those)\b/i.test(text))) {
             const id = "act" in r ? r.act : r.ask;
             const label = "act" in r ? intentLabel(targets[id], said.verb) : targets[id].label;
             highlights.guess(highlightBox(targets[id]), label, "act" in r ? "guess" : "unsure");
@@ -185,6 +191,17 @@ export function VoiceIntent() {
       }
       performance.measure("voice:scan", "voice:match-start", "voice:scanned");
       performance.measure("voice:match", "voice:match-start");
+      if (!m && !final) {
+        // Nothing certain yet: show a faint guess among what is on screen, purely as a cue.
+        const id = looseGuess(text, targets);
+        guessed.current = null;
+        if (id === null) highlights.clearGuess();
+        else {
+          highlights.guess(highlightBox(targets[id]), COPY.voice.maybe(targets[id].label), "hint");
+          setStatus(COPY.voice.maybe(targets[id].label));
+        }
+        return;
+      }
       if (!m) {
         guessed.current = null;
         highlights.clearGuess();

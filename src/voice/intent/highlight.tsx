@@ -9,7 +9,8 @@ import { createPortal } from "react-dom";
 import "../live/voice.css";
 import { reveal } from "./scroll";
 
-export type HighlightState = "guess" | "unsure" | "doing" | "done";
+// hint: a low-stakes visual guess (looseGuess) shown while words arrive; never scrolls.
+export type HighlightState = "hint" | "guess" | "unsure" | "doing" | "done";
 
 export interface Highlight {
   key: number;
@@ -40,14 +41,14 @@ export const highlights = {
   },
   get: () => items,
   // The current guess (one at a time). Same element: only the label/state change.
-  guess(el: HTMLElement, label: string, state: "guess" | "unsure" = "guess") {
+  guess(el: HTMLElement, label: string, state: "hint" | "guess" | "unsure" = "guess") {
     const rest = items.filter((h) => h.state === "done");
-    const cur = items.find((h) => h.state === "guess" || h.state === "unsure");
+    const cur = items.find((h) => h.state === "hint" || h.state === "guess" || h.state === "unsure");
     if (cur && cur.el === el && cur.label === label && cur.state === state) return;
     setItems([...rest, { key: cur?.el === el ? cur.key : nextKey++, el, label, state }]);
   },
   clearGuess() {
-    if (items.some((h) => h.state === "guess" || h.state === "unsure")) setItems(items.filter((h) => h.state === "done" || h.state === "doing"));
+    if (items.some((h) => h.state === "hint" || h.state === "guess" || h.state === "unsure")) setItems(items.filter((h) => h.state === "done" || h.state === "doing"));
   },
   doing(el: HTMLElement, label: string) {
     const cur = items.find((h) => h.state !== "done" && h.el === el);
@@ -126,7 +127,7 @@ function Ring({ h }: { h: Highlight }) {
   useEffect(() => {
     const landed = h.state === "done" && lastState.current === "doing";
     lastState.current = h.state;
-    if (scrolled.current === h.el || (h.state === "done" && !landed)) return;
+    if (scrolled.current === h.el || h.state === "hint" || (h.state === "done" && !landed)) return;
     const go = () => {
       if (!h.el.isConnected) return;
       scrolled.current = h.el;

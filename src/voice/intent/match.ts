@@ -52,6 +52,8 @@ const OPPOSITES: [string, string][] = [
   ["expand", "collapse"],
   ["more", "less"],
   ["increase", "decrease"],
+  ["bigger", "smaller"],
+  ["larger", "smaller"],
   ["include", "exclude"],
   ["first", "last"],
   ["accept", "decline"],
@@ -98,8 +100,18 @@ const VERBS: [RegExp, Verb][] = [
 const DO = /\b(do (it|that)|yes|yeah|yep|go ahead|confirm|okay|ok|sure)\b/g;
 
 const STOP = new Set(
-  "a an the to my me of and or with when while doing for please i i'd id want would like can you could it this that these those is be on off in at up some any page button checkbox box option radio toggle switch link tab field one just only now also then so let's lets us no uh uhh um umm uhm er erm hmm ah oh well".split(" "),
+  "a an the to my me of and or with when while doing for please i i'd id want would like can you could it this that these those is be on off in at up some any page button checkbox box option radio toggle switch link tab field one just only now also then so let's lets us no uh uhh um umm uhm er erm hmm ah oh well wait sorry actually mean rather instead scratch".split(" "),
 );
+
+// A correction ("voice control, wait, voice reader"; "remote, no, on site"): only what follows counts.
+const CORRECTION = /\b(wait|sorry|actually|i mean|rather|instead|no|not that|scratch that|never ?mind)\b/gi;
+export function afterCorrection(text: string): string {
+  let cut = -1;
+  for (const m of text.matchAll(CORRECTION)) cut = m.index + m[0].length;
+  if (cut < 0) return text;
+  const rest = text.slice(cut).replace(/^[\s,.;:!?-]+/, "");
+  return tokens(rest).length ? rest : text;
+}
 
 export function stem(w: string): string {
   if (w.length > 5 && w.endsWith("ing")) return w.slice(0, -3);
@@ -200,6 +212,29 @@ function nameHits(names: string[], said: Set<string>, raw: Set<string> = said): 
   return best;
 }
 
+// A low-stakes visual guess while the person is still talking, for when bestMatch has nothing yet:
+// only controls already on screen (it never scrolls), any word in common counts. Never acted on.
+export function looseGuess(text: string, candidates: Candidate[]): number | null {
+  const { words, raw } = parse(text);
+  if (!words.length) return null;
+  const said = new Set(words);
+  const saidRaw = new Set(raw);
+  const at = new Map<string, number>();
+  words.forEach((w, i) => at.set(w, i));
+  let best: { id: number; score: number } | null = null;
+  for (const c of candidates) {
+    if (!c.inView || c.hidden || c.current) continue;
+    const h = nameHits(c.names, said, saidRaw);
+    if (!h.hits) continue;
+    // The newest keyword leads; then how much of the name was said.
+    let latest = -1;
+    for (const w of h.used) latest = Math.max(latest, at.get(w) ?? -1);
+    const score = latest * 10 + h.hits * 2 + h.coverage;
+    if (!best || score > best.score) best = { id: c.id, score };
+  }
+  return best?.id ?? null;
+}
+
 // The page already open, when that is all that was said ("go to jobs" while on Jobs).
 export function alreadyHere(text: string, candidates: Candidate[]): Candidate | null {
   const { words, raw } = parse(text);
@@ -220,6 +255,8 @@ export interface MatchOptions {
 }
 
 const STICKY_BONUS = 0.75;
+// The latest keywords lead: a control matching the most recent words gets up to this much.
+const RECENCY_BONUS = 0.6;
 // Same words, different kinds of control: the verb says which ("press add skill" is the button,
 // "add skill" alone selects the box to type in).
 const AFFINITY: Record<Verb | "none", Kind[]> = {
@@ -259,6 +296,11 @@ export function bestMatch(text: string, candidates: Candidate[], opts: MatchOpti
   const here = new Set<string>();
   for (const c of candidates) if (c.current) for (const w of hitsOf(c).used) here.add(w);
 
+  // Position of each word, latest occurrence, for recency.
+  const at = new Map<string, number>();
+  words.forEach((w, i) => at.set(w, i));
+  const newest = words.at(-1);
+
   const scored: Scored[] = [];
   for (const c of candidates) {
     const h = hitsOf(c);
@@ -286,7 +328,11 @@ export function bestMatch(text: string, candidates: Candidate[], opts: MatchOpti
     if (c.hidden) score -= 0.3;
     if (c.inView) score += 0.1;
     if (recent !== undefined && (c.id === recent || c.parent === recent)) score += 0.2;
-    if (c.id === sticky) score += STICKY_BONUS;
+    // Stickiness only while the newest word still fits: a new keyword moves the guess at once.
+    if (c.id === sticky && (newest === undefined || h.used.has(newest))) score += STICKY_BONUS;
+    let latest = -1;
+    for (const w of h.used) latest = Math.max(latest, at.get(w) ?? -1);
+    if (words.length) score += (RECENCY_BONUS * (latest + 1)) / words.length;
     if (AFFINITY[verb ?? "none"].includes(c.kind)) score += AFFINITY_BONUS;
     if (context && c.parent !== undefined && context.has(c.parent)) score += CONTEXT_BONUS;
     scored.push({ c, own: h.hits, score });
