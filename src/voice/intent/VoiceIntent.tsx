@@ -15,9 +15,9 @@ import type { AgentLine } from "../agent/protocol";
 import { getVoiceSettings } from "../agent/settings";
 import { execute, fillText, intentLabel } from "./execute";
 import { highlights, HighlightLayer } from "./highlight";
-import { afterCorrection, alreadyHere, bestMatch, looseGuess, parse, type Match, type Verb } from "./match";
+import { afterCorrection, alreadyHere, bestMatch, looseGuess, parse, tokens, type Match, type Verb } from "./match";
 import { highlightBox, scanCached, type Target } from "./scan";
-import { parseScroll, scrollPage } from "./scroll";
+import { parseScroll, scrollPage, type ScrollCommand } from "./scroll";
 import { resolveVerbOnly } from "./resolve";
 import { useVoiceActions } from "./actions";
 
@@ -69,6 +69,17 @@ function commonGroup(targets: Target[], ids: number[]): Target | undefined {
     return out;
   });
   return chains[0]?.map((p) => targets[p]).find((g) => g && chains.every((c) => c.includes(g.id)));
+}
+
+// The region a scroll command names ("the list", "the filters"): a group called exactly that.
+function regionNamed(where: string, targets: Target[]): HTMLElement | null {
+  const want = new Set(tokens(where));
+  if (!want.size) return null;
+  const same = (name: string) => {
+    const t = new Set(tokens(name));
+    return t.size === want.size && [...want].every((w) => t.has(w));
+  };
+  return targets.find((t) => t.kind === "group" && !t.hidden && t.names.some(same))?.el ?? null;
 }
 
 export function VoiceIntent() {
@@ -148,12 +159,13 @@ export function VoiceIntent() {
     const agentAvailable = () => getVoiceSettings().agent && !!tokenRef.current;
 
     // answering: a proposal was waiting when they spoke; a different choice in reply is their answer.
-    const startAgent = (text: string, targets: Target[], guesses: number[], fallback: () => void, answering: HTMLElement | null = null) => {
+    // continued: a second look at the same request, after the first one's press showed new fields.
+    const startAgent = (text: string, targets: Target[], guesses: number[], fallback: () => void, answering: HTMLElement | null = null, continued = false) => {
       agentRun.current?.abort.abort();
       const abort = new AbortController();
       const runState = { text, abort, started: false };
       agentRun.current = runState;
-      remember("user", text);
+      if (!continued) remember("user", text);
       setPanel({ phase: "thinking" });
       const timer = window.setTimeout(() => {
         if (!runState.started) abort.abort();
@@ -165,9 +177,15 @@ export function VoiceIntent() {
         selection: idOf(targets, recent.current),
         guesses,
         guidance: settings.guidance,
-        history: conversation.current.slice(0, -1),
+        history: continued ? conversation.current : conversation.current.slice(0, -1),
       });
       const said: string[] = [];
+      // A press can open a form whose fields the assistant could not see ("add an interview on
+      // November 5 at 2 pm" opens the date field). Its words then wait: if new fields appeared, it
+      // takes one more look and those words are replaced.
+      let pressed = false;
+      const held: string[] = [];
+      const before = new Set(targets.map((t) => t.el));
       let answered = false; // their reply chose something: the confirmation replaces any question
       const onLine = (line: AgentLine) => {
         if (agentRun.current !== runState) return;
@@ -183,7 +201,8 @@ export function VoiceIntent() {
           if (answered) return;
           said.push(line.text);
           if (line.text.trim().endsWith("?")) askedAt.current = Date.now();
-          reply(line.text);
+          if (pressed && !continued) held.push(line.text);
+          else reply(line.text);
           return;
         }
         const t = targets.find((x) => x.id === line.id);
@@ -192,10 +211,17 @@ export function VoiceIntent() {
           if (t.kind !== "text") return;
           highlights.doing(highlightBox(t), COPY.voice.typing(t.label));
           chain = chain.then(() => {
-            fillText(t.el, line.text);
+            const typed = fillText(t.el, line.text);
             recent.current = t.el;
-            highlights.done(highlightBox(t), COPY.voice.typed(line.text));
-            remember("assistant", `[typed "${line.text}" into ${t.label}]`);
+            if (typed === null) {
+              // Not a date the field can take ("soon"): say so rather than leave it blank.
+              highlights.done(highlightBox(t), COPY.voice.notADate);
+              remember("assistant", `[could not read "${line.text}" as a date for ${t.label}]`);
+              reply(COPY.voice.notADate);
+              return;
+            }
+            highlights.done(highlightBox(t), COPY.voice.typed(typed));
+            remember("assistant", `[typed "${typed}" into ${t.label}]`);
           });
           return;
         }
@@ -221,12 +247,27 @@ export function VoiceIntent() {
           highlights.guess(highlightBox(t), intentLabel(t, line.verb), "unsure");
           return;
         }
+        if (t.kind === "button" || t.kind === "link" || line.verb === "press") pressed = true;
         perform(t, line.verb, false, targets);
       };
+      const speakHeld = () => held.splice(0).forEach(reply);
       streamAgent(body, tokenRef.current!, onLine, abort.signal)
-        .then(() => {
-          if (agentRun.current === runState && said.length) remember("assistant", said.join(" "));
-          if (agentRun.current === runState && !runState.started) fallback();
+        .then(async () => {
+          if (agentRun.current !== runState) return;
+          if (!runState.started) return fallback();
+          if (pressed && !continued) {
+            await chain;
+            await new Promise<void>((r) => requestAnimationFrame(() => r()));
+            const now = scanCached();
+            const opened = now.some((t) => !before.has(t.el) && !t.private && (t.kind === "text" || t.kind === "select" || t.kind === "checkbox" || t.kind === "radio"));
+            if (opened && agentRun.current === runState) {
+              const first = held.splice(0); // said only if the second look fails
+              remember("assistant", "[that opened new fields; finishing the request]");
+              return startAgent(text, now, [], () => first.forEach(reply), null, true);
+            }
+          }
+          if (said.length) remember("assistant", said.join(" "));
+          speakHeld();
         })
         .catch(() => {
           // Unavailable, timed out, or failed before acting: keyword matching answers instead
@@ -291,12 +332,23 @@ export function VoiceIntent() {
       }
       // A fresh command after words that went nowhere counts on its own.
       const clause = lastClause(text);
-      const scroll = parseScroll(text) ?? parseScroll(lastTurn.current) ?? parseScroll(clause);
+      // A scroll that names an area ("scroll down the list") counts only when the page has it.
+      let scroll: ScrollCommand | null = null;
+      let region: HTMLElement | null = null;
+      for (const said of [text, lastTurn.current, clause]) {
+        const c = parseScroll(said);
+        if (!c) continue;
+        region = c.where ? regionNamed(c.where, scanCached()) : null;
+        if (c.where && !region) continue;
+        scroll = c;
+        break;
+      }
       if (scroll) {
         highlights.clearGuess();
         if (!final) return;
         session.consume();
-        const msg = scrollPage(scroll, recent.current?.isConnected ? recent.current : document.activeElement);
+        if (region) recent.current = region; // "scroll down" next keeps scrolling the same area
+        const msg = scrollPage(scroll, region ?? (recent.current?.isConnected ? recent.current : document.activeElement));
         reply(msg);
         return;
       }

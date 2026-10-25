@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -10,6 +10,7 @@ import { useAnnounce } from "../a11y/Announcer";
 import { Icon, type IconName } from "../components/Icon";
 import { formatDate } from "../components/Accommodation";
 import { toAppError } from "../lib/errors";
+import { useFitLayout } from "../lib/useFitLayout";
 
 type Row = NonNullable<ReturnType<typeof useQuery<typeof api.applications.list>>>[number];
 
@@ -29,14 +30,19 @@ export default function TrackerPage() {
   const sorted = useMemo(() => {
     const r = [...(rows ?? [])];
     if (sort === "updated") r.sort((a, b) => b.updatedAt - a.updatedAt);
-    else r.sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999") || b.updatedAt - a.updatedAt);
+    // Ties keep the order the jobs were saved in, so editing a row never moves it.
+    else r.sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"));
     return r;
   }, [rows, sort]);
+
+  // Wide, tall-enough screens: the page stops scrolling and the table scrolls in its panel (styles in base.css).
+  const tableRef = useRef<HTMLDivElement>(null);
+  useFitLayout(tableRef, { minWidth: 960, minHeight: 360, enabled: !!rows?.length });
 
   const counts = APPLICATION_STATUSES.map((s) => ({ s, n: (rows ?? []).filter((r) => r.status === s).length }));
 
   return (
-    <main id="main" className="container stack" style={{ paddingBlock: "32px 56px", gap: 24 }}>
+    <main id="main" className="container stack tracker-page" style={{ paddingBlock: "32px 56px", gap: 24 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
           <PageHeading>{COPY.tracker.title}</PageHeading>
@@ -74,13 +80,13 @@ export default function TrackerPage() {
           )}
           {/* A scrollable region must be keyboard-focusable (axe: scrollable-region-focusable). */}
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-          <div className="panel" style={{ padding: 0, overflowX: "auto" }} role="region" aria-label="Saved jobs table, scrolls sideways" tabIndex={0}>
+          <div ref={tableRef} className="panel tracker-table" style={{ padding: 0 }} role="region" aria-label="Saved jobs table, scrollable" tabIndex={0} data-voice-scroll>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 1180 }}>
               <caption className="sr-only">Saved jobs</caption>
               <thead>
                 <tr>
                   {["Job", "Status", "Deadline", "Follow-up date", "Interviews", "Email draft", "Notes", "Updated"].map((h) => (
-                    <th key={h} scope="col" style={{ textAlign: "left", fontSize: "0.82rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted-2)", padding: "12px 14px", borderBottom: "2px solid var(--ink)" }}>{h}</th>
+                    <th key={h} scope="col" style={{ textAlign: "left", fontSize: "0.82rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted-2)", padding: "12px 14px" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -96,6 +102,7 @@ export default function TrackerPage() {
   );
 }
 
+const AUTOSAVE_MS = 800;
 const td = { padding: "16px 14px", borderBottom: "1px solid #e4e6eb", verticalAlign: "top" } as const;
 
 function TrackerRow({ row, onStatus }: { row: Row; onStatus: (s: string) => void }) {
@@ -122,6 +129,34 @@ function TrackerRow({ row, onStatus }: { row: Row; onStatus: (s: string) => void
     }
   };
 
+  // Notes and dates save by themselves a moment after a change (typing, a date picked, or voice),
+  // and at once when the field is left, so nothing waits on a click elsewhere. Only real changes
+  // are saved, and each one once.
+  const saved = useRef({ notes: row.notes, deadline: row.deadline, followUpDate: row.followUpDate });
+  const pending = useRef(new Map<string, { timer: number; run: () => void }>());
+  const commit = (field: "notes" | "deadline" | "followUpDate", value: string | null, message: string) => {
+    if (value === saved.current[field]) return;
+    saved.current = { ...saved.current, [field]: value };
+    void save({ [field]: value }, message);
+  };
+  const later = (key: string, run: () => void) => {
+    window.clearTimeout(pending.current.get(key)?.timer);
+    pending.current.set(key, { timer: window.setTimeout(() => (pending.current.delete(key), run()), AUTOSAVE_MS), run });
+  };
+  const now = (key: string, run: () => void) => {
+    window.clearTimeout(pending.current.get(key)?.timer);
+    pending.current.delete(key);
+    run();
+  };
+  // Leaving the page saves what is still waiting.
+  useEffect(() => {
+    const waiting = pending.current;
+    return () => waiting.forEach((p) => (window.clearTimeout(p.timer), p.run()));
+  }, []);
+  const saveNotes = (v: string) => commit("notes", v, `${title}: notes saved.`);
+  const saveDeadline = (v: string) => commit("deadline", v || null, `${title}: deadline saved.`);
+  const saveFollowUp = (v: string) => commit("followUpDate", v || null, `${title}: follow-up date saved.`);
+
   return (
     <tr data-voice-names={[title, row.job?.employerName && `${title} at ${row.job.employerName}`, row.job?.employerName].filter(Boolean).join("|")}>
       <td style={td}>
@@ -143,12 +178,12 @@ function TrackerRow({ row, onStatus }: { row: Row; onStatus: (s: string) => void
       <td style={td}>
         <label htmlFor={`dl-${row._id}`} className="sr-only">Deadline for {title}</label>
         <input id={`dl-${row._id}`} type="date" className="input" style={{ minHeight: 44, width: "auto" }} defaultValue={row.deadline ?? ""} data-voice-names="deadline|due date"
-          onBlur={(e) => { if ((e.target.value || null) !== row.deadline) void save({ deadline: e.target.value || null }, `${title}: deadline saved.`); }} />
+          onChange={(e) => { const v = e.target.value; later("deadline", () => saveDeadline(v)); }} onBlur={(e) => { const v = e.target.value; now("deadline", () => saveDeadline(v)); }} />
       </td>
       <td style={td}>
         <label htmlFor={`fu-${row._id}`} className="sr-only">Follow-up date for {title}</label>
-        <input id={`fu-${row._id}`} type="date" className="input" style={{ minHeight: 44, width: "auto" }} defaultValue={row.followUpDate ?? ""} data-voice-names="follow up|follow-up|reminder date"
-          onBlur={(e) => { if ((e.target.value || null) !== row.followUpDate) void save({ followUpDate: e.target.value || null }, `${title}: follow-up date saved.`); }} />
+        <input id={`fu-${row._id}`} type="date" className="input" style={{ minHeight: 44, width: "auto" }} defaultValue={row.followUpDate ?? ""} data-voice-names="follow up|follow-up|follow up date|reminder date"
+          onChange={(e) => { const v = e.target.value; later("followUp", () => saveFollowUp(v)); }} onBlur={(e) => { const v = e.target.value; now("followUp", () => saveFollowUp(v)); }} />
       </td>
       <td style={td}>
         {row.interviews.length === 0 && <span className="muted">None yet</span>}
@@ -193,8 +228,8 @@ function TrackerRow({ row, onStatus }: { row: Row; onStatus: (s: string) => void
       </td>
       <td style={td}>
         <label htmlFor={`nt-${row._id}`} className="sr-only">Notes for {title}</label>
-        <textarea id={`nt-${row._id}`} className="input" rows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} style={{ minWidth: 180 }} data-voice-names="notes|my notes"
-          onBlur={() => { if (notes !== row.notes) void save({ notes }, `${title}: notes saved.`); }} />
+        <textarea id={`nt-${row._id}`} className="input" rows={2} maxLength={2000} value={notes} style={{ minWidth: 180 }} data-voice-names="notes|my notes|a note|note"
+          onChange={(e) => { const v = e.target.value; setNotes(v); later("notes", () => saveNotes(v)); }} onBlur={() => now("notes", () => saveNotes(notes))} />
       </td>
       <td style={td}>
         {formatDate(new Date(row.updatedAt).toISOString().slice(0, 10))}

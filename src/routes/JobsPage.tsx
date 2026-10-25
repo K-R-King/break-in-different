@@ -13,7 +13,8 @@ import { AccommodationRow, LabelBadge, sourceName, timeAgo } from "../components
 import { Icon } from "../components/Icon";
 import { HighlightedText, useReader } from "../voice/reader";
 import { useVoiceHandlers } from "../voice/VoiceProvider";
-import { useVoiceActions } from "../voice/intent/actions";
+import { useVoiceActions, type VoiceAction } from "../voice/intent/actions";
+import { reveal } from "../voice/intent/scroll";
 import { ACCOMMODATION_VOICE, voiceNames } from "../voice/vocabulary";
 import { toAppError } from "../lib/errors";
 import { useFitLayout } from "../lib/useFitLayout";
@@ -21,6 +22,9 @@ import { useFitLayout } from "../lib/useFitLayout";
 const MIN_COLUMN_HEIGHT = 360;
 
 type Item = NonNullable<ReturnType<typeof useQuery<typeof api.matches.list>>>["items"][number];
+
+const ORDINALS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+const NUMBER_WORDS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 
 export default function JobsPage() {
   useDocumentTitle(COPY.jobs.title);
@@ -99,7 +103,13 @@ export default function JobsPage() {
   const selectedIndex = items.findIndex((i) => i.jobId === selected);
   const current = selectedIndex >= 0 ? items[selectedIndex] : null;
 
-  const focusCard = (jobId: string) => document.getElementById(`job-${jobId}`)?.focus();
+  // Brings the card into view in the list (clear of the sticky results bar) and focuses it.
+  const focusCard = (jobId: string) => {
+    const card = document.getElementById(`job-${jobId}`);
+    if (!card) return;
+    reveal(card);
+    card.focus({ preventScroll: true });
+  };
   const toggleSave = async (it: Item) => {
     try {
       if (it.saved) {
@@ -118,12 +128,22 @@ export default function JobsPage() {
   const nextItem = items[Math.min(items.length - 1, selectedIndex + 1)];
   const previousItem = items[Math.max(0, selectedIndex - 1)];
   const goTo = (it: Item | undefined) => { if (it) { setSelected(it.jobId); focusCard(it.jobId); announce(`${it.job.title} at ${it.job.employerName}`); } };
-  // Voice: move through the results without naming a job.
+  // Voice: move through the results without naming a job ("next job", "top job", "the third one").
+  const jumpTo = (i: number | (() => number), names: string[]): VoiceAction => {
+    const at = () => (typeof i === "number" ? i : i());
+    return {
+      names, run: () => goTo(items[at()]), anchor: () => (items[at()] ? document.getElementById(`job-${items[at()].jobId}`) : null),
+      message: () => (items[at()] ? `${items[at()].job.title} at ${items[at()].job.employerName}.` : ""), when: () => at() >= 0 && at() < items.length,
+    };
+  };
   useVoiceActions([
     { names: ["Next job", "next", "next one", "next listing", "skip this one"], run: () => goTo(nextItem), anchor: () => (nextItem ? document.getElementById(`job-${nextItem.jobId}`) : null),
       message: () => (nextItem ? `${nextItem.job.title} at ${nextItem.job.employerName}.` : "That was the last job."), when: () => items.length > 0 && selectedIndex < items.length - 1 },
     { names: ["Previous job", "previous", "previous one", "the one before"], run: () => goTo(previousItem), anchor: () => (previousItem ? document.getElementById(`job-${previousItem.jobId}`) : null),
       message: () => (previousItem ? `${previousItem.job.title} at ${previousItem.job.employerName}.` : "This is the first job."), when: () => selectedIndex > 0 },
+    jumpTo(0, ["Top job", "first job", "top match", "best match", "the top one", "the first one", "top listing", "first listing", "job 1", "job one", "job number one"]),
+    ...ORDINALS.slice(1).map((o, i) => jumpTo(i + 1, [`${o[0].toUpperCase()}${o.slice(1)} job`, `the ${o} one`, `${o} listing`, `${o} match`, `job ${i + 2}`, `job ${NUMBER_WORDS[i + 1]}`, `job number ${NUMBER_WORDS[i + 1]}`])),
+    jumpTo(() => items.length - 1, ["Last job", "bottom job", "the last one", "last listing", "the bottom one"]),
   ]);
 
   useVoiceHandlers({
@@ -159,7 +179,7 @@ export default function JobsPage() {
   useFitLayout(layoutRef, { minWidth: 1100, minHeight: MIN_COLUMN_HEIGHT, enabled: !incomplete });
 
   return (
-    <main id="main" className="container jobs-page" style={{ paddingBlock: "32px 48px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
+    <main id="main" className="container jobs-page" style={{ paddingBlock: "24px 40px", display: "flex", flexDirection: "column", gap: 18, maxWidth: 1400 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end", gap: "16px 32px" }}>
         <div>
           <PageHeading>{COPY.jobs.title}</PageHeading>
@@ -240,18 +260,18 @@ export default function JobsPage() {
 
           <section className="jobs-col main" aria-labelledby="res-h" aria-busy={running || data === undefined} data-voice-scroll
             data-voice-names="results|job results|job list|the list|matches">
-            <div className="row jobs-results-bar" style={{ justifyContent: "space-between" }}>
+            <div className="row jobs-results-bar" style={{ justifyContent: "space-between", gap: 8 }}>
               <h2 id="res-h" style={{ margin: 0, fontSize: "1.2rem" }}>
                 {running || data === undefined ? COPY.jobs.finding : `${items.length} jobs found`}
               </h2>
-              <div className="row" style={{ gap: 8 }}>
-                <span className="small muted">{COPY.jobs.sortNote}</span>
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => void doRun()} disabled={running} data-voice-names="refresh|refresh jobs|update matches|reload jobs">Refresh matches</button>
-              </div>
+              <button className="btn btn-secondary btn-sm" type="button" onClick={() => void doRun()} disabled={running} data-voice-names="refresh|refresh jobs|update matches|reload jobs">Refresh matches</button>
             </div>
-            {data?.engine === "fallback" && <p className="note" data-testid="notice-fallback"><strong>{COPY.jobs.scoredWithoutAgent}.</strong> Results come from our built-in scorer.</p>}
-            {data?.usingSavedListings && <p className="note" data-testid="notice-saved"><strong>{COPY.jobs.usingSavedListings}.</strong> Listings were collected earlier; each card shows when it was checked.</p>}
-            <p className="note">{COPY.jobs.aiNote}</p>
+            {/* One compact note above the list, so more of the list fits on screen. */}
+            <div className="note stack" style={{ gap: 4 }}>
+              {data?.engine === "fallback" && <p style={{ margin: 0 }} data-testid="notice-fallback"><strong>{COPY.jobs.scoredWithoutAgent}.</strong> Results come from our built-in scorer.</p>}
+              {data?.usingSavedListings && <p style={{ margin: 0 }} data-testid="notice-saved"><strong>{COPY.jobs.usingSavedListings}.</strong> Listings were collected earlier; each card shows when it was checked.</p>}
+              <p style={{ margin: 0 }}>{COPY.jobs.sortNote} {COPY.jobs.aiNote}</p>
+            </div>
             {runError && (
               <div className="callout callout-error" role="alert">
                 <Icon name="alert" /><span>{runError}</span>
@@ -281,7 +301,7 @@ export default function JobsPage() {
                 <Link to="/profile" className="btn btn-secondary" style={{ alignSelf: "flex-start" }}>Edit your profile</Link>
               </div>
             )}
-            <ol style={{ listStyle: "none", margin: 0, padding: 0 }} className="stack" aria-label="Job matches">
+            <ol style={{ listStyle: "none", margin: 0, padding: 0, gap: 10 }} className="stack" aria-label="Job matches">
               {items.map((it) => (
                 <li key={it.jobId}>
                   <JobCard it={it} selected={it.jobId === selected} onSelect={() => setSelected(it.jobId)} onToggleSave={() => void toggleSave(it)} onRead={() => { setSelected(it.jobId); readJob(it, `${it.job.title} at ${it.job.employerName}. ${it.explanation}`); }} />
@@ -316,15 +336,15 @@ function JobCard({ it, selected, onSelect, onToggleSave, onRead }: { it: Item; s
   };
   return (
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- mouse shortcut; the title link is the keyboard path
-    <article id={`job-${it.jobId}`} tabIndex={-1} aria-labelledby={`jt-${it.jobId}`} aria-current={selected ? "true" : undefined} onClick={onCardClick}
+    <article id={`job-${it.jobId}`} tabIndex={-1} aria-labelledby={`jt-${it.jobId}`} aria-current={selected ? "true" : undefined} onClick={onCardClick} data-voice-select
       data-voice-names={[`${it.job.title} at ${it.job.employerName}`, it.job.location && `${it.job.title} in ${it.job.location}`, it.job.employerName].filter(Boolean).join("|")}
-      className="stack job-card" style={{ background: "var(--surface)", border: selected ? "3px solid var(--ink)" : "1px solid var(--line)", borderRadius: 18, padding: selected ? 18 : 20, gap: 12 }}>
-      <div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap", gap: 14 }}>
+      className="stack job-card" style={{ background: "var(--surface)", border: selected ? "3px solid var(--ink)" : "1px solid var(--line)", borderRadius: 16, padding: selected ? 13 : 15, gap: 8 }}>
+      <div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap", gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 id={`jt-${it.jobId}`} style={{ margin: 0, fontSize: "1.18rem" }}>
+          <h3 id={`jt-${it.jobId}`} style={{ margin: 0, fontSize: "1.06rem", lineHeight: 1.3 }}>
             <a href="#detail" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSelect(); setTimeout(() => document.getElementById("detail-heading")?.focus(), 0); }} style={{ color: "var(--ink)", textDecoration: "none" }}>{it.job.title}</a>
           </h3>
-          <div className="row small muted" style={{ gap: "4px 14px", marginTop: 4 }}>
+          <div className="row small muted" style={{ gap: "2px 12px", marginTop: 2 }}>
             <span style={{ fontWeight: 700, color: "var(--ink)" }}>{it.job.employerName}</span>
             <span>{it.job.location || "Location not stated"}</span>
             <span>{EXPERIENCE_LABELS[it.job.experienceLevel]}</span>
@@ -332,26 +352,28 @@ function JobCard({ it, selected, onSelect, onToggleSave, onRead }: { it: Item; s
             {it.job.accommodationForm && <span className="lb lb-verified" data-testid="form-badge"><Icon name="check" size={14} strokeWidth={3} />{COPY.jobs.formBadge}</span>}
           </div>
         </div>
-        <div aria-label={`Match score ${it.score} out of 100`} role="img" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 68, height: 68, borderRadius: 14, border: "2px solid var(--ink)", fontWeight: 800, lineHeight: 1 }}>
-          <span style={{ fontSize: "1.55rem" }}>{it.score}</span><span style={{ fontSize: "0.7rem", fontWeight: 600 }}>/ 100</span>
+        <div aria-label={`Match score ${it.score} out of 100`} role="img" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 54, height: 54, borderRadius: 12, border: "2px solid var(--ink)", fontWeight: 800, lineHeight: 1 }}>
+          <span style={{ fontSize: "1.3rem" }}>{it.score}</span><span style={{ fontSize: "0.7rem", fontWeight: 600 }}>/ 100</span>
         </div>
       </div>
-      <ul aria-label="Score factors" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
-        <li className="fc">{f.skills.limitedInfo ? COPY.jobs.limitedSkills : `Skills ${Math.round(f.skills.ratio * 100)}%`}</li>
-        <li className="fc">Role: {f.role.type === "exact" ? "exact" : "close match"}</li>
-        <li className="fc">Location: {f.location.fit ? (f.location.reason === "job is remote" ? "remote" : "fits") : "no match"}</li>
-        {f.conflicts.length > 0 && <li className="fc fc-conflict">Conflict −{Math.min(40, f.conflicts.length * 25)}</li>}
-      </ul>
-      {total > 0 && (
-        <p className="row" style={{ margin: 0, gap: 8 }} data-testid="coverage">
-          <span className="sr-only">Your required accommodations: </span>
-          {c.requiredStated.length > 0 && <span className="lb lb-stated"><Icon name="check" size={14} strokeWidth={3} />Stated: {c.requiredStated.length} of {total}</span>}
-          {c.requiredStated.length === 0 && <span className="lb lb-stated" style={{ opacity: 1 }}>Stated: 0 of {total}</span>}
-          {unverifiedRequired > 0 && <span className="lb lb-unverified"><Icon name="help" size={14} strokeWidth={2.6} />Unverified: {unverifiedRequired}</span>}
-          {c.requiredNotMentioned.length - unverifiedRequired > 0 && <span className="lb lb-unavailable"><Icon name="minus" size={14} strokeWidth={3} />Not mentioned: {c.requiredNotMentioned.length - unverifiedRequired}</span>}
-          {c.requiredConflicting.length > 0 && <span className="lb lb-conflict"><Icon name="alert" size={14} strokeWidth={2.6} />Conflicts: {c.requiredConflicting.length}</span>}
-        </p>
-      )}
+      <div className="row" style={{ gap: 6 }}>
+        <ul aria-label="Score factors" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <li className="fc">{f.skills.limitedInfo ? COPY.jobs.limitedSkills : `Skills ${Math.round(f.skills.ratio * 100)}%`}</li>
+          <li className="fc">Role: {f.role.type === "exact" ? "exact" : "close match"}</li>
+          <li className="fc">Location: {f.location.fit ? (f.location.reason === "job is remote" ? "remote" : "fits") : "no match"}</li>
+          {f.conflicts.length > 0 && <li className="fc fc-conflict">Conflict −{Math.min(40, f.conflicts.length * 25)}</li>}
+        </ul>
+        {total > 0 && (
+          <p className="row" style={{ margin: 0, gap: 6 }} data-testid="coverage">
+            <span className="sr-only">Your required accommodations: </span>
+            {c.requiredStated.length > 0 && <span className="lb lb-stated"><Icon name="check" size={14} strokeWidth={3} />Stated: {c.requiredStated.length} of {total}</span>}
+            {c.requiredStated.length === 0 && <span className="lb lb-stated" style={{ opacity: 1 }}>Stated: 0 of {total}</span>}
+            {unverifiedRequired > 0 && <span className="lb lb-unverified"><Icon name="help" size={14} strokeWidth={2.6} />Unverified: {unverifiedRequired}</span>}
+            {c.requiredNotMentioned.length - unverifiedRequired > 0 && <span className="lb lb-unavailable"><Icon name="minus" size={14} strokeWidth={3} />Not mentioned: {c.requiredNotMentioned.length - unverifiedRequired}</span>}
+            {c.requiredConflicting.length > 0 && <span className="lb lb-conflict"><Icon name="alert" size={14} strokeWidth={2.6} />Conflicts: {c.requiredConflicting.length}</span>}
+          </p>
+        )}
+      </div>
       {f.conflicts.map((cf) => (
         <blockquote key={cf.code} className="quote quote-conflict small">Conflicts with {ACCOMMODATION_LABELS[cf.code].toLowerCase()}. Listing says: "{cf.quote}"</blockquote>
       ))}
@@ -359,7 +381,7 @@ function JobCard({ it, selected, onSelect, onToggleSave, onRead }: { it: Item; s
         Source: {sourceName(it.job.source)} · <a href={it.job.sourceUrl} target="_blank" rel="noopener noreferrer">original listing<span className="sr-only"> for {it.job.title} (opens in a new tab)</span></a> · checked {timeAgo(it.job.fetchedAt)}
         {stale && <strong style={{ color: "var(--unverified-ink)" }}> {COPY.jobs.stale}</strong>}
       </p>
-      <div className="row" style={{ gap: 8 }}>
+      <div className="row" style={{ gap: 6 }}>
         <button className="btn btn-secondary btn-sm" type="button" aria-pressed={it.saved} onClick={onToggleSave} data-voice-command={it.saved ? "off" : "on"}
           data-voice-names={it.saved ? "unsave|remove from saved" : "save this job|bookmark"}><Icon name="bookmark" size={18} filled={it.saved} />{it.saved ? "Saved" : "Save"}</button>
         <button className="btn btn-secondary btn-sm" type="button" onClick={onRead}><Icon name="volume" size={18} />Read aloud</button>
@@ -403,20 +425,20 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
   const readText = full || prefs.voiceReader ? job.descriptionText : summary;
 
   return (
-    <section id="detail" aria-labelledby="detail-heading" className="jobs-col detail panel stack" style={{ padding: 26, gap: 18 }}
+    <section id="detail" aria-labelledby="detail-heading" className="jobs-col detail panel stack" style={{ padding: 20, gap: 14 }}
       data-voice-names={`${job.title} at ${job.employer?.name ?? ""}|job details|this job|the open job`} data-voice-primary>
-      <div className="stack" style={{ gap: 6 }}>
+      <div className="stack" style={{ gap: 4 }}>
         {job.isDemo && <div className="row small muted" style={{ gap: 8 }}><span className="demo">DEMO</span>{COPY.common.demoNote}</div>}
-        <h2 id="detail-heading" tabIndex={-1} style={{ margin: 0, fontSize: "1.65rem", lineHeight: 1.2 }}>{job.title}</h2>
-        <div className="row muted" style={{ gap: "4px 14px" }}>
+        <h2 id="detail-heading" tabIndex={-1} style={{ margin: 0, fontSize: "1.35rem", lineHeight: 1.25 }}>{job.title}</h2>
+        <div className="row small muted" style={{ gap: "2px 12px" }}>
           <span style={{ fontWeight: 700, color: "var(--ink)" }}>{job.employer?.name}</span>
           <span className="row" style={{ gap: 4 }}><Icon name="pin" size={16} />{job.location || "Location not stated"}</span>
           <span>{EXPERIENCE_LABELS[job.experienceLevel]}</span>
           <span>{ROLE_LABELS[job.roleFamily]}</span>
         </div>
       </div>
-      <div className="row">
-        <Link className="btn btn-primary btn-lg" to={`/jobs/${jobId}/email`} style={{ minHeight: 52 }}
+      <div className="row" style={{ gap: 8 }}>
+        <Link className="btn btn-primary" to={`/jobs/${jobId}/email`}
           data-voice-names="apply|apply for this job|request accommodations|ask for accommodations|accommodation email|email the employer|write the email|draft an email"
           data-voice-say="Here's the accommodation email for this job. Choose what to ask for, then I can write the draft.">Request accommodations and apply</Link>
         <button className="btn btn-secondary" type="button" aria-pressed={item.saved} onClick={onToggleSave} data-voice-command={item.saved ? "off" : "on"}
@@ -440,8 +462,8 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
         </div>
       )}
 
-      <div className="stack" style={{ gap: 10 }} ref={aboutRef} data-voice-names="about the role|job summary">
-        <h3 style={{ margin: 0, fontSize: "1.12rem" }}>About the role</h3>
+      <div className="stack" style={{ gap: 10 }} ref={aboutRef} data-voice-names="about the role|job summary|the description">
+        <h3 style={{ margin: 0, fontSize: "1.02rem" }}>About the role</h3>
         <div className="row" style={{ justifyContent: "space-between", padding: "10px 14px", borderRadius: 12, background: "var(--ground)", border: "1px solid var(--line)" }}>
           {reading ? (
             <>
@@ -483,13 +505,13 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
 
       {job.employer?.description && (
         <div className="stack" style={{ gap: 6 }}>
-          <h3 style={{ margin: 0, fontSize: "1.12rem" }}>About {job.employer.name}</h3>
+          <h3 style={{ margin: 0, fontSize: "1.02rem" }}>About {job.employer.name}</h3>
           <p style={{ margin: 0 }}>{job.employer.description} <span className="small muted">({job.employer.descriptionSource ?? "From the listing"})</span></p>
         </div>
       )}
 
       <div>
-        <h3 style={{ margin: "0 0 4px", fontSize: "1.12rem" }}>Accommodations in this listing</h3>
+        <h3 style={{ margin: "0 0 4px", fontSize: "1.02rem" }}>Accommodations in this listing</h3>
         {codes.length === 0 && <p style={{ margin: 0 }}>{COPY.jobs.notMentioned}</p>}
         {codes.map((code) => (
           <AccommodationRow key={code} code={code}
@@ -498,8 +520,8 @@ function JobDetail({ jobId, item, required, preferred, onToggleSave }: {
         ))}
       </div>
 
-      <div className="stack" style={{ gap: 10, padding: 16, borderRadius: 14, background: "var(--ground)", border: "1px solid var(--line)" }}>
-        <h3 style={{ margin: 0, fontSize: "1.12rem" }}>Why it scored {item.score}</h3>
+      <div className="stack" style={{ gap: 8, padding: 14, borderRadius: 14, background: "var(--ground)", border: "1px solid var(--line)" }}>
+        <h3 style={{ margin: 0, fontSize: "1.02rem" }}>Why it scored {item.score}</h3>
         <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "1fr auto", gap: "6px 16px" }}>
           <dt>Skills · {f.skills.limitedInfo ? "the listing names no skills" : `${f.skills.matched.length} of ${f.skills.matched.length + f.skills.missing.length} listed`}{f.skills.missing.length > 0 && ` (missing: ${f.skills.missing.slice(0, 4).join(", ")})`}</dt>
           <dd style={{ margin: 0, fontWeight: 700 }}>+{s}</dd>

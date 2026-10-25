@@ -2,15 +2,23 @@
 // - Commands: "scroll down" (half the visible area), "scroll down a bit" (a quarter), "page down"
 //   (almost a screen), "go to the top". They scroll the area the person is working in: the
 //   scrollable column holding the current selection (or the open dialog), otherwise the page.
+//   Naming an area scrolls that one instead: "scroll down the list", "scroll the filters up",
+//   "go to the top of the results" (`where`, matched against the page's regions by VoiceIntent).
 // - reveal(): brings a highlighted control fully into view, clear of whatever covers the edges
 //   of its scroll area (sticky bars, the voice button and panel), with room for its label.
 
-export type ScrollCommand = { dir: 1 | -1; amount: "step" | "page" | "bit" | "end" };
+export type ScrollCommand = { dir: 1 | -1; amount: "step" | "page" | "bit" | "end"; where?: string };
 
 const SHARE = { step: 0.5, bit: 0.25, page: 0.85 } as const;
 
 const END = /\b(?:scroll|go|jump|move|take me)(?: back)?(?: all the way)? (?:up |down )?to (?:the )?(top|bottom|end|start|beginning)\b/g;
 const STEP = /\b(scroll|page|move|go)(?: the page)? (down|up)\b(?:(?: just)? a (?:little )?(bit|little))?/g;
+// "scroll the job list down": the area named between the verb and the direction.
+const AREA_WORD = "(?!(?:down|up|scroll)\\b)[a-z']+";
+const REGION = new RegExp(`\\bscroll (?:through |in )?((?:${AREA_WORD} ){0,3}?${AREA_WORD}) (down|up)\\b(?:(?: just)? a (?:little )?(bit|little))?`, "g");
+// Words that make it more than a scroll ("scroll down to the filters and select remote"), or a
+// correction ("scroll down, no, scroll up").
+const MORE = /\b(and|select|choose|pick|open|press|click|tap|turn|check|tick|type|save|read|apply|no|not|wait|actually|sorry|instead)\b/;
 const BARE = /\b(down|up)\b/g; // "down", "uh, up"
 // Hesitations, politeness and lead-ins around a command ("uh", often heard as "I"; "can you",
 // "I want to", "let me").
@@ -24,7 +32,9 @@ const tidy = (s: string) => s.toLowerCase().replace(/[^a-z' ]+/g, " ").replace(/
 // last one said: repeating is impatience, not a request for three steps.
 export function parseScroll(text: string): ScrollCommand | null {
   let s = tidy(text);
+  const said = s;
   const hits: { at: number; cmd: ScrollCommand }[] = [];
+  let named = "";
   const take = (re: RegExp, cmd: (m: RegExpExecArray) => ScrollCommand) => {
     s = s.replace(re, (...args) => {
       const m = args.slice(0, -2) as unknown as RegExpExecArray;
@@ -33,11 +43,21 @@ export function parseScroll(text: string): ScrollCommand | null {
     });
   };
   take(END, (m) => ({ dir: m[1] === "top" || m[1] === "start" || m[1] === "beginning" ? -1 : 1, amount: "end" }));
+  take(REGION, (m) => {
+    named += ` ${m[1]}`;
+    return { dir: m[2] === "up" ? -1 : 1, amount: m[3] ? "bit" : "step" };
+  });
   take(STEP, (m) => ({ dir: m[2] === "up" ? -1 : 1, amount: m[3] ? "bit" : m[1] === "page" ? "page" : "step" }));
   if (!hits.length && tidy(s.replace(FILLER, "").replace(BARE, ""))) return null;
   if (!hits.length) take(BARE, (m) => ({ dir: m[1] === "up" ? -1 : 1, amount: "step" }));
-  if (!hits.length || tidy(s.replace(FILLER, ""))) return null;
-  return hits.sort((a, b) => a.at - b.at).at(-1)!.cmd;
+  if (!hits.length) return null;
+  const cmd = hits.sort((a, b) => a.at - b.at).at(-1)!.cmd;
+  // Words left over name the area to scroll, when the command says so: with "scroll" ("scroll down
+  // the list") or "top/bottom of" ("go to the top of the list"). "Go to the top job" is not a scroll.
+  const where = tidy(`${named} ${s}`.replace(FILLER, "").replace(/\bof\b/g, ""));
+  if (!where) return cmd;
+  if (MORE.test(said) || !/\bscroll\b|\b(top|bottom|end|start|beginning) of\b/.test(said)) return null;
+  return { ...cmd, where };
 }
 
 function reducedMotion(): boolean {
@@ -126,11 +146,27 @@ export function reveal(el: HTMLElement): boolean {
   const top = view.top + ROOM_TOP;
   const bottom = view.bottom - ROOM_BOTTOM;
   const r = el.getBoundingClientRect();
+  const behavior: ScrollBehavior = reducedMotion() ? "auto" : "smooth";
+  const sideways = revealSideways(el, r, behavior);
   let delta = 0;
   if (r.top < top || r.height > bottom - top) delta = r.top - top; // above, or too tall: align its top
   else if (r.bottom > bottom) delta = r.bottom - bottom;
-  if (Math.abs(delta) < 1) return false;
-  const behavior: ScrollBehavior = reducedMotion() ? "auto" : "smooth";
+  if (Math.abs(delta) < 1) return sideways;
   (box ?? window).scrollBy({ top: delta, behavior });
   return true;
+}
+
+// A wide table that scrolls sideways (the tracker): bring the control's column into view.
+function revealSideways(el: HTMLElement, r: DOMRect, behavior: ScrollBehavior): boolean {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    if (!/^(auto|scroll)$/.test(getComputedStyle(p).overflowX) || p.scrollWidth <= p.clientWidth + 1) continue;
+    const box = p.getBoundingClientRect();
+    const left = box.left + ROOM_BOTTOM;
+    const right = box.right - ROOM_BOTTOM;
+    const delta = r.left < left || r.width > right - left ? r.left - left : r.right > right ? r.right - right : 0;
+    if (Math.abs(delta) < 1) return false;
+    p.scrollBy({ left: delta, behavior });
+    return true;
+  }
+  return false;
 }

@@ -13,6 +13,7 @@ import { COPY } from "../../copy";
 import { ACTION_PAST, type Verb } from "./match";
 import type { Target } from "./scan";
 import { reveal } from "./scroll";
+import { DATE_TYPES, sayDateValue, spokenDateValue } from "./dates";
 
 const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
@@ -45,6 +46,13 @@ function describe(t: Target): string {
 }
 
 function select(t: Target): Outcome {
+  // A list item that opens when chosen (a job card, data-voice-select): choosing it opens it.
+  if (t.kind === "group" && t.el.hasAttribute("data-voice-select")) {
+    t.el.click();
+    reveal(t.el);
+    t.el.focus({ preventScroll: true });
+    return { changed: true, message: `Selected ${t.label}.`, el: t.el };
+  }
   if (t.kind === "group") {
     reveal(t.el);
     const first = t.el.querySelector<HTMLElement>('input:not([type="hidden"]):not([disabled]), select, textarea, button:not([disabled]), a[href]');
@@ -190,12 +198,25 @@ export async function execute(t: Target, verb: Verb | null): Promise<Outcome> {
   }
 }
 
-// Puts text into a text field as if typed (React sees the change), and focuses it.
-export function fillText(el: HTMLElement, text: string) {
+// Puts text into a text field as if typed (React sees the change), and focuses it. A date field
+// gets the spoken date in the form it accepts ("next Friday" → "2026-10-30"); words that are not a
+// date leave it unchanged. Returns what was put in, as it is read back, or null.
+export function fillText(el: HTMLElement, text: string): string | null {
+  let value = text;
+  if (el instanceof HTMLInputElement && DATE_TYPES.has(el.type)) {
+    const date = spokenDateValue(text, el.type);
+    if (!date) {
+      el.focus({ preventScroll: true });
+      return null;
+    }
+    value = date;
+  }
   const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, text);
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
   el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
   el.focus({ preventScroll: true });
+  return value === text ? text : sayDateValue(value);
 }
 
 // What the highlight tag says before acting.

@@ -188,6 +188,7 @@ export const COPY = {
     chosen: (where: string | undefined, name: string) => (where ? `Set ${where} to ${name}.` : `${name}.`),
     typing: (field: string) => `Typing in ${field}`,
     typed: (text: string) => `Typed "${text}".`,
+    notADate: "I couldn't read that as a date. Say a day and month, like November 3, or a day like next Friday.",
     whichPlace: (name: string, places: string[]) =>
       places.length ? `"${name}" for which one: ${places.slice(0, 3).join(", ")}${places.length > 3 ? ", or another" : ""}?` : `Which "${name}"?`,
     whichOne: (a: string, b: string) => `"${a}" or "${b}"? Say which one.`,

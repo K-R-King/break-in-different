@@ -5,6 +5,7 @@
 import type { Target } from "../intent/scan";
 import type { Guidance } from "./settings";
 import { pageInfo } from "./pages";
+import { DATE_TYPES } from "../intent/dates";
 
 const MAX_TARGETS = 120; // fewer, most relevant first: less for the model to read, faster replies
 const MAX_TEXT = 1500;
@@ -20,6 +21,9 @@ function stateOf(t: Target): string | undefined {
   if (t.kind === "checkbox") return t.checked ? "on" : "off";
   if (t.kind === "radio") return t.checked ? "selected" : "not selected";
   if (t.kind === "button" && t.toggle) return t.checked ? "on" : "off";
+  // A date field takes the date as said ("next Friday"); the page converts it.
+  if (el instanceof HTMLInputElement && DATE_TYPES.has(el.type))
+    return `${el.type === "time" ? "time" : el.type === "date" ? "date" : "date and time"} field, ${el.value ? `value: ${el.value}` : "empty"}; type the date as the person said it`;
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value ? `value: ${el.value.slice(0, 80)}` : "empty";
   if (el instanceof HTMLSelectElement) return el.selectedOptions[0]?.text;
   return undefined;

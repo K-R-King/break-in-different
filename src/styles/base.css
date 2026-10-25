@@ -135,13 +135,16 @@ dialog.modal { border-radius: 18px; width: min(560px, calc(100vw - 32px)); }
    does not scroll; each column scrolls on its own. Narrow or short screens (or large text) scroll normally. */
 .jobs-layout { display: flex; flex-direction: column; gap: 24px; }
 .jobs-col.side { display: flex; flex-direction: column; gap: 16px; }
-.jobs-col.main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
-.jobs-col.detail { min-width: 0; }
+.jobs-col.main { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.jobs-col.main > .note { margin: 0; padding: 8px 12px; }
+.jobs-col.detail { min-width: 0; overflow-wrap: anywhere; }
+.jobs-col.detail .btn { white-space: normal; }
 .job-card { cursor: pointer; }
 .job-card :is(a, button, input, label) { cursor: pointer; }
+.job-card .btn-sm { padding: 0 10px; }
 .job-card:not([aria-current="true"]):hover { border-color: var(--line-strong) !important; box-shadow: 0 2px 10px rgba(20, 21, 26, 0.08); }
 @media (min-width: 1100px) {
-  .jobs-layout { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; }
+  .jobs-layout { display: grid; grid-template-columns: minmax(240px, 270px) minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; }
 }
 /* Fit-to-window pages: data-layout="fit" is set by useFitLayout (src/lib/useFitLayout.ts) only when the
    window is wide enough and the scrolling columns would still be at least 360px tall. */
@@ -157,6 +160,14 @@ html[data-layout="fit"] #root > main { flex: 1; min-height: 0; width: 100%; }
   html[data-layout="fit"] .jobs-col.side, html[data-layout="fit"] .jobs-col.main { padding: 2px 6px 16px 2px; }
   html[data-layout="fit"] .jobs-results-bar { position: sticky; top: -2px; z-index: 2; background: var(--ground); padding-block: 6px; }
 }
+
+/* Tracker: the table scrolls inside its panel, with the column headings kept in view. When the page
+   fits the window the panel fills the rest of it and scrolls both ways. */
+.tracker-table { overflow: auto; scroll-padding-top: 52px; }
+.tracker-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); box-shadow: inset 0 -2px 0 var(--ink); }
+html[data-layout="fit"] .tracker-page { padding-bottom: 16px !important; }
+html[data-layout="fit"] .tracker-page > * { flex: none; }
+html[data-layout="fit"] .tracker-page > .tracker-table { flex: 1; min-height: 0; overscroll-behavior: contain; }
 
 /* Profile: section list and progress beside the form. When the page fits the window, the form scrolls
    on its own and the progress stays in view. */

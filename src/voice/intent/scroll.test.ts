@@ -25,7 +25,17 @@ describe("parseScroll", () => {
     expect(parseScroll("let me scroll to the bottom")).toEqual({ dir: 1, amount: "end" });
   });
 
+  it("scrolls a named area", () => {
+    expect(parseScroll("scroll down the list")).toEqual({ dir: 1, amount: "step", where: "list" });
+    expect(parseScroll("Scroll the job list down.")).toEqual({ dir: 1, amount: "step", where: "job list" });
+    expect(parseScroll("scroll the filters up a bit")).toEqual({ dir: -1, amount: "bit", where: "filters" });
+    expect(parseScroll("go to the top of the list")).toEqual({ dir: -1, amount: "end", where: "list" });
+    expect(parseScroll("scroll to the bottom of the results")).toEqual({ dir: 1, amount: "end", where: "results" });
+  });
+
   it("leaves other commands alone", () => {
+    expect(parseScroll("go to the top job")).toBeNull(); // the first job, not a scroll
+    expect(parseScroll("go to the bottom one")).toBeNull();
     expect(parseScroll("go to the tracker")).toBeNull();
     expect(parseScroll("scroll down to the filters and select remote")).toBeNull();
   });

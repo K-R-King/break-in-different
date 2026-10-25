@@ -20,9 +20,13 @@ const PAGES: [RegExp, string, string][] = [
   [
     /^\/jobs/,
     "Jobs",
-    "Jobs ranked for the person. Left: filters (work setup, location, experience level) and required accommodations. Middle: the results list; each job card has Save, Read aloud and Request accommodations. Right: the open job, with Request accommodations and apply, Save, Practice an interview, Read aloud, the description, and what the listing says about each accommodation. 'Next job' and 'previous job' move through the list; 'read the description' reads the open job aloud.",
+    "Jobs ranked for the person. Left: filters (work setup, location, experience level) and required accommodations. Middle: the results list; each job card has Save, Read aloud and Request accommodations. Right: the open job, with Request accommodations and apply, Save, Practice an interview, Read aloud, the description, and what the listing says about each accommodation. Choosing a job card (by its name, or the commands 'Top job', 'Second job' … 'Tenth job', 'Last job', 'Next job', 'Previous job') opens it on the right and scrolls the list to it; use those commands for 'the first job', 'the third one' and so on. 'Scroll down the list' scrolls the results; 'read the description' reads the open job aloud.",
   ],
-  [/^\/tracker/, "Application tracker", "Saved jobs in a table: status (Saved, Applied, Interviewing, Rejected), deadline, follow-up date, interviews, the email draft, and notes for each job."],
+  [
+    /^\/tracker/,
+    "Application tracker",
+    "Saved jobs in a table, one row per job: status (Saved, Applied, Interviewing, Rejected), deadline, follow-up date, interviews, the email draft, and notes. Every change saves by itself; there is no Save button, so never offer to save. Act on the row the person chose (the selection) unless they name another job. Date fields take the date as said ('November 3', 'next Friday'); type it as said.",
+  ],
 ];
 
 export function pageInfo(path: string): { name: string; hint: string } {
