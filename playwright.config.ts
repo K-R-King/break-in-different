@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Runs against a running stack: `npm run dev` (Vite + local Convex) or `./scripts/demo.sh up` (port 8080).
+// Runs against a running stack: `npm run dev` (Vite + local Convex) or `./scripts/demo.sh up` / `./scripts/demo-docker.sh up` (port 8080).
 export default defineConfig({
   testDir: "./tests",
   timeout: 90_000,

@@ -168,3 +168,4 @@ __pycache__/
 test-results/
 playwright-report/
 scratch-*.log
+.demo-local/

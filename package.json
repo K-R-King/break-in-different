@@ -20,6 +20,7 @@
     "ingest": "npx convex run ingest/run:run",
     "demo": "./scripts/demo.sh up",
     "demo:reset": "./scripts/demo.sh reset",
+    "demo:docker": "./scripts/demo-docker.sh up",
     "check:integrations": "node scripts/check-integrations.mjs"
   },
   "dependencies": {

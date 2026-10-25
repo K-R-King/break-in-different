@@ -12,6 +12,12 @@ const report = (name, present, required) => {
   if (!present && required) ok = false;
 };
 
+const demo = parse(".demo-local/env");
+if (demo) {
+  console.log("== .demo-local/env (no-Docker demo)");
+  for (const k of ["CONVEX_INSTANCE_SECRET", "AGENT_SHARED_SECRET"]) report(k, !!demo[k], true);
+  report("CONVEX_SELF_HOSTED_ADMIN_KEY", !!demo.CONVEX_SELF_HOSTED_ADMIN_KEY, false);
+}
 const docker = parse(".env.docker");
 if (docker) {
   console.log("== .env.docker (Docker Compose demo)");
@@ -37,8 +43,8 @@ if (local) {
     ok = false;
   }
 }
-if (!docker && !local) {
-  console.log("No .env.docker or .env.local found. Run ./scripts/demo.sh init (Docker) or see README.");
+if (!demo && !docker && !local) {
+  console.log("No .demo-local/env, .env.docker or .env.local found. Run ./scripts/demo.sh up (or ./scripts/demo-docker.sh up for Docker), or see README.");
   ok = false;
 }
 process.exit(ok ? 0 : 1);

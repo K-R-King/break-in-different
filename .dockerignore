@@ -9,3 +9,4 @@ playwright-report
 !.env.example
 !.env.docker.example
 agent/.env
+.demo-local
