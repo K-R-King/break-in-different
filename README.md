@@ -65,6 +65,8 @@ Prerequisites: Docker Desktop (or OrbStack), `openssl`, `curl`. Uses the ports a
 
 `keys`, `reset`, `down`, `logs` and `admin-key` work as above. `npm run demo:docker` is the same as `up`.
 
+Opening the app from another machine (e.g. a VPS)? Set `PUBLIC_HOST=<server IP or DNS name>` in `.env.docker`, open ports 8080, 3210 and 3211, then run `up` again. The browser reaches Convex at that host, so with the default `127.0.0.1` sign-in fails from any other machine.
+
 ### Startup time and optimization plan
 
 Measured on 2026-10-24 (Apple silicon, OrbStack):

@@ -1,5 +1,7 @@
 # Break In Different — whole demo environment.
 # Quick start: ./scripts/demo-docker.sh up   (see README "Run with Docker Compose"; ./scripts/demo.sh runs the same stack without Docker)
+# PUBLIC_HOST (in .env.docker) is the host the browser uses to reach these ports; set it to the server's IP or DNS name
+# when the app is opened from another machine. Defaults to 127.0.0.1 (same machine).
 services:
   backend:
     image: ghcr.io/convex/convex-backend:latest
@@ -11,8 +13,8 @@ services:
     volumes:
       - convex-data:/convex/data
     environment:
-      - CONVEX_CLOUD_ORIGIN=http://127.0.0.1:3210
-      - CONVEX_SITE_ORIGIN=http://127.0.0.1:3211
+      - CONVEX_CLOUD_ORIGIN=http://${PUBLIC_HOST:-127.0.0.1}:3210
+      - CONVEX_SITE_ORIGIN=http://${PUBLIC_HOST:-127.0.0.1}:3211
       - INSTANCE_NAME=break-in-different
       - INSTANCE_SECRET=${CONVEX_INSTANCE_SECRET:?run ./scripts/demo-docker.sh init first}
       - DISABLE_BEACON=true
@@ -30,7 +32,7 @@ services:
     ports:
       - "6791:6791"
     environment:
-      - NEXT_PUBLIC_DEPLOYMENT_URL=http://127.0.0.1:3210
+      - NEXT_PUBLIC_DEPLOYMENT_URL=http://${PUBLIC_HOST:-127.0.0.1}:3210
     depends_on:
       backend:
         condition: service_healthy
@@ -48,6 +50,7 @@ services:
         required: false
     environment:
       - CONVEX_SELF_HOSTED_URL=http://backend:3210
+      - SITE_URL=${SITE_URL:-http://${PUBLIC_HOST:-localhost}:8080}
     depends_on:
       backend:
         condition: service_healthy
@@ -57,9 +60,11 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
       args:
-        VITE_CONVEX_URL: http://127.0.0.1:3210
+        VITE_CONVEX_URL: http://${PUBLIC_HOST:-127.0.0.1}:3210
     ports:
       - "8080:80"
+    environment:
+      - PUBLIC_HOST=${PUBLIC_HOST:-127.0.0.1} # allowed in the CSP (docker/nginx.conf)
     depends_on:
       backend:
         condition: service_healthy

@@ -12,5 +12,7 @@ ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
 RUN npx vite build
 
 FROM nginx:1.27-alpine
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+# Rendered to conf.d/default.conf at start; only defined env vars (PUBLIC_HOST) are substituted, so $uri is kept.
+ENV PUBLIC_HOST=127.0.0.1
+COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
