@@ -1,0 +1,3 @@
+#!/bin/sh
+# Sourced by the nginx entrypoint before templates are rendered: the WebSocket form of CONVEX_URL for the CSP.
+export CONVEX_WS_URL="$(printf '%s' "$CONVEX_URL" | sed 's|^http|ws|')"

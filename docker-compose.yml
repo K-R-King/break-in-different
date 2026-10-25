@@ -2,19 +2,21 @@
 # Quick start: ./scripts/demo-docker.sh up   (see README "Run with Docker Compose"; ./scripts/demo.sh runs the same stack without Docker)
 # PUBLIC_HOST (in .env.docker) is the host the browser uses to reach these ports; set it to the server's IP or DNS name
 # when the app is opened from another machine. Defaults to 127.0.0.1 (same machine).
+# Behind an HTTPS proxy, set CONVEX_URL, CONVEX_SITE_URL and SITE_URL instead, and BIND_IP=127.0.0.1 so only the proxy
+# reaches these ports (see .env.docker.example).
 services:
   backend:
     image: ghcr.io/convex/convex-backend:latest
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      - "3210:3210" # Convex API (browser connects here)
-      - "3211:3211" # Convex HTTP actions (/health, /agent/*, auth)
+      - "${BIND_IP:-0.0.0.0}:3210:3210" # Convex API (browser connects here)
+      - "${BIND_IP:-0.0.0.0}:3211:3211" # Convex HTTP actions (/health, /agent/*, auth)
     volumes:
       - convex-data:/convex/data
     environment:
-      - CONVEX_CLOUD_ORIGIN=http://${PUBLIC_HOST:-127.0.0.1}:3210
-      - CONVEX_SITE_ORIGIN=http://${PUBLIC_HOST:-127.0.0.1}:3211
+      - CONVEX_CLOUD_ORIGIN=${CONVEX_URL:-http://${PUBLIC_HOST:-127.0.0.1}:3210}
+      - CONVEX_SITE_ORIGIN=${CONVEX_SITE_URL:-http://${PUBLIC_HOST:-127.0.0.1}:3211}
       - INSTANCE_NAME=break-in-different
       - INSTANCE_SECRET=${CONVEX_INSTANCE_SECRET:?run ./scripts/demo-docker.sh init first}
       - DISABLE_BEACON=true
@@ -30,7 +32,7 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      - "6791:6791"
+      - "${BIND_IP:-0.0.0.0}:6791:6791"
     environment:
       - NEXT_PUBLIC_DEPLOYMENT_URL=http://${PUBLIC_HOST:-127.0.0.1}:3210
     depends_on:
@@ -60,11 +62,14 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
       args:
-        VITE_CONVEX_URL: http://${PUBLIC_HOST:-127.0.0.1}:3210
+        VITE_CONVEX_URL: ${CONVEX_URL:-http://${PUBLIC_HOST:-127.0.0.1}:3210}
+        VITE_CONVEX_SITE_URL: ${CONVEX_SITE_URL:-http://${PUBLIC_HOST:-127.0.0.1}:3211}
     ports:
-      - "8080:80"
+      - "${BIND_IP:-0.0.0.0}:8080:80"
     environment:
-      - PUBLIC_HOST=${PUBLIC_HOST:-127.0.0.1} # allowed in the CSP (docker/nginx.conf)
+      # Allowed in the CSP (docker/nginx.conf)
+      - CONVEX_URL=${CONVEX_URL:-http://${PUBLIC_HOST:-127.0.0.1}:3210}
+      - CONVEX_SITE_URL=${CONVEX_SITE_URL:-http://${PUBLIC_HOST:-127.0.0.1}:3211}
     depends_on:
       backend:
         condition: service_healthy

@@ -67,6 +67,8 @@ Prerequisites: Docker Desktop (or OrbStack), `openssl`, `curl`. Uses the ports a
 
 Opening the app from another machine (e.g. a VPS)? Set `PUBLIC_HOST=<server IP or DNS name>` in `.env.docker`, open ports 8080, 3210 and 3211, then run `up` again. The browser reaches Convex at that host, so with the default `127.0.0.1` sign-in fails from any other machine.
 
+Serving it on a domain over HTTPS? Point three hostnames at a reverse proxy (app → 8080, Convex API → 3210, Convex HTTP actions → 3211), set `CONVEX_URL`, `CONVEX_SITE_URL`, `SITE_URL` and `BIND_IP=127.0.0.1` in `.env.docker` (see `.env.docker.example`), then run `up` again. Everyone signs in again after the switch; data is kept.
+
 ### Startup time and optimization plan
 
 Measured on 2026-10-24 (Apple silicon, OrbStack):

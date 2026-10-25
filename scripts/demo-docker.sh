@@ -44,7 +44,8 @@ up() {
   "${DC[@]}" run --rm --build deploy
   "${DC[@]}" up -d --build web agent
   echo
-  echo "Ready:  app http://localhost:8080   ·   Convex dashboard http://localhost:6791"
+  local site; site=$(sed -n 's/^SITE_URL=//p' "$ENV_FILE")
+  echo "Ready:  app ${site:-http://localhost:8080}   ·   Convex dashboard http://localhost:6791"
   echo "Health: $(curl -s http://127.0.0.1:3211/health)"
 }
 

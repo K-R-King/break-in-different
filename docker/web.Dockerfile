@@ -8,11 +8,13 @@ COPY src src
 COPY shared shared
 COPY convex convex
 ARG VITE_CONVEX_URL=http://127.0.0.1:3210
-ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
+ARG VITE_CONVEX_SITE_URL=http://127.0.0.1:3211
+ENV VITE_CONVEX_URL=$VITE_CONVEX_URL VITE_CONVEX_SITE_URL=$VITE_CONVEX_SITE_URL
 RUN npx vite build
 
 FROM nginx:1.27-alpine
-# Rendered to conf.d/default.conf at start; only defined env vars (PUBLIC_HOST) are substituted, so $uri is kept.
-ENV PUBLIC_HOST=127.0.0.1
+# Rendered to conf.d/default.conf at start; only defined env vars (CONVEX_*) are substituted, so $uri is kept.
+ENV CONVEX_URL=http://127.0.0.1:3210 CONVEX_SITE_URL=http://127.0.0.1:3211
+COPY docker/convex-ws-url.envsh /docker-entrypoint.d/15-convex-ws-url.envsh
 COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
