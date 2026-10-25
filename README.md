@@ -171,9 +171,24 @@ Repository: `src/` React app · `convex/` backend (`ai/`, `match/`, `ingest/`, `
 |---|---|---|
 | **Convex** (self-hosted) | The whole backend: database, Convex Auth (email + password), file storage for resumes and audio, reactive queries, actions, crons (ingest, retention), HTTP actions for the agent | None needed (it is the backend) |
 | **Anthropic Claude** | Resume skill extraction (PDF or text), listing extraction (skills, experience level, accommodation mentions with verbatim quotes), match explanations from factor data, accommodation email drafts. JSON-schema structured output; `claude-haiku-5-5` for extraction, `claude-sonnet-5-5` for writing | Rules-based extraction, template explanations and a fixed email template; notice "AI help is unavailable. You can still write this yourself." |
-| **Cartesia** | Read aloud: TTS over SSE (`sonic-3.6`) with `add_timestamps` word timings for word-by-word highlighting, cached by text hash (job text only, capped at 1,500 characters). Voice: batch speech-to-text (`ink-whisper`) for push-to-talk commands and dictation | Browser speech synthesis with boundary highlighting ("Using your browser's voice"); keyboard and mouse for commands |
+| **Cartesia** | Every voice in the app: read aloud, the practice interviewer, the voice assistant's replies, live voice control and dictation (details below) | Browser speech synthesis ("Using your browser's voice") for anything spoken; keyboard and mouse instead of voice input |
 | **Apify** | Collects listings with the Store Actor `bovi/greenhouse-lever-ashby-job-scraper` for the curated employer list | Direct fetch of the same public Greenhouse and Lever endpoints (1 request/second), then the seeded data |
 | **Fetch.ai uAgents** | MatchAgent: polls Convex for anonymous match requests, scores them with the shared rules, posts factor breakdowns back | TypeScript scorer in Convex (`engine: fallback`) |
+
+### Cartesia features we use
+
+All calls send `Cartesia-Version: 2026-08-14`. The API key stays in Convex; the browser only ever gets short-lived access tokens.
+
+| Feature in the app | Cartesia API | Code |
+|---|---|---|
+| Read a job aloud with word-by-word highlighting | Sonic TTS over SSE (`sonic-3.6`) with word timestamps; audio cached in Convex file storage by text hash | `convex/tts.ts`, `src/voice/reader.tsx` |
+| Practice interview: the interviewer speaks each question | Same Sonic SSE call, with word timings for highlighting | `convex/ai/practice.ts` |
+| Voice assistant speaks its replies | Sonic TTS over WebSocket from the browser, one sentence at a time as Claude writes it | `src/voice/agent/speech.ts` |
+| Live voice control (the voice button: speak and the page follows) | Ink 2 speech-to-text over the turns WebSocket, with built-in end-of-turn detection | `src/voice/live/turnsSocket.ts` |
+| "Hold to talk" commands, dictation and spoken practice answers | Batch speech-to-text (`ink-whisper`) | `convex/stt.ts`, `src/voice/VoiceProvider.tsx` |
+| Browser access without exposing the key | `POST /access-token` with TTS and STT grants, 60-second tokens | `convex/voice.ts` |
+
+Without a Cartesia key, everything spoken falls back to the browser's voice, and voice input is off (keyboard and mouse still do everything). `npm run check:integrations -- cartesia` checks the TTS timestamps and an STT round trip with your key.
 
 ## Data sources
 
@@ -198,8 +213,10 @@ Target: WCAG 2.2 AA. Accessibility settings work before login (font: system, Atk
 
 - Claude extraction can misread listings and resumes; quotes show what a listing says, not what an employer will do; the score is a guide, not a hiring prediction. The email is a starting point, not legal advice.
 - Without an Anthropic key, PDF resumes cannot be read (paste text instead) and listing extraction uses conservative rules, which find fewer accommodations.
-- The Apify Actor's output field names are mapped from its input schema and README; they are confirmed only after the first run with a token (`// PROVISIONAL: S4`).
-- Direct-fetch ingest takes a capped subset per board, so it cannot detect closed listings; only full Apify runs close missing listings.
+- The Apify Actor works (confirmed with a real run, 2026-10-25), but it returns no listing HTML, shortened Lever descriptions, and rows sorted by title, so a run keeps very few engineering roles. The demo listings come from the direct path (`scripts/build-seed.sh`), which is also the only path that finds accommodation forms. Details: `docs/open-questions.md` #10.
+- Direct-fetch ingest takes a capped subset per board, so it cannot detect closed listings; Apify runs do close missing listings, and with the sorting above they can close listings that are still open.
+- Voice input (live voice, "Hold to talk", dictation, spoken practice answers) needs a Cartesia key; there is no browser speech-recognition fallback. Dictation recordings are limited to about a minute, and read aloud covers the first 1,500 characters of a job.
+- Per-user hourly limits apply to Cartesia (30 read-aloud calls, 120 dictations, 240 live voice tokens) and Claude (20 calls). On the live site they share the team's keys.
 - No email verification or password reset (needs an email provider); follow-up dates send no reminders.
 - The resume upload trusts the storage ID from the signed-in client for the few seconds before the file is deleted.
 - Manual screen-reader passes (NVDA, VoiceOver), precision@5 labelling (A6) and human accuracy review of Stated labels (A7) are assigned to a teammate and not yet done.
